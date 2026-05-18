@@ -46,18 +46,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             _virtualLibraryBasePath = virtualLibraryBasePath ?? throw new ArgumentNullException(nameof(virtualLibraryBasePath));
         }
 
-        /// <summary>
-        /// Gets the virtual library path for a specific user and media type.
-        /// </summary>
-        /// <param name="userId">User ID.</param>
-        /// <param name="mediaType">Media type (Movie or Series).</param>
-        /// <returns>Full path to the user's virtual library directory.</returns>
-        public string GetUserLibraryPath(Guid userId, MediaType mediaType)
-        {
-            var subfolder = mediaType == MediaType.Movie ? "movies" : "tv";
-            return Path.Combine(_virtualLibraryBasePath, userId.ToString(), subfolder);
-        }
-
         /// <summary>Gets the path for the Leaving Soon Movies shared library.</summary>
         public string LeavingSoonMoviesPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "movies");
 
@@ -69,6 +57,18 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
         /// <summary>Gets the path for the Removal Candidates TV shared library (admin only).</summary>
         public string RemovalCandidatesTvPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "removal-tv");
+
+        /// <summary>
+        /// Gets the virtual library path for a specific user and media type.
+        /// </summary>
+        /// <param name="userId">User ID.</param>
+        /// <param name="mediaType">Media type (Movie or Series).</param>
+        /// <returns>Full path to the user's virtual library directory.</returns>
+        public string GetUserLibraryPath(Guid userId, MediaType mediaType)
+        {
+            var subfolder = mediaType == MediaType.Movie ? "movies" : "tv";
+            return Path.Combine(_virtualLibraryBasePath, userId.ToString(), subfolder);
+        }
 
         /// <summary>
         /// Ensures the virtual library directories exist for a user.
