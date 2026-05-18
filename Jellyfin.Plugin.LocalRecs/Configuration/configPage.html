@@ -109,6 +109,42 @@
                             <div class="fieldDescription">Limit tag vocabulary size (0 = unlimited, default: 500)</div>
                         </div>
                         
+                        <h2 class="sectionTitle">Leaving Soon</h2>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="leavingSoonEnabled" name="leavingSoonEnabled" />
+                                <span>Enable Leaving Soon Libraries</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Flag items least likely to be watched by any user. After a dwell period they move to Removal Candidates.</div>
+                        </div>
+
+                        <div id="leavingSoonSettingsContainer">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonMovieCount">Leaving Soon Movie Count:</label>
+                                <input is="emby-input" type="number" id="leavingSoonMovieCount" name="leavingSoonMovieCount" min="0" max="500" />
+                                <div class="fieldDescription">Number of movies to flag as Leaving Soon (default: 25)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonTvCount">Leaving Soon TV Count:</label>
+                                <input is="emby-input" type="number" id="leavingSoonTvCount" name="leavingSoonTvCount" min="0" max="500" />
+                                <div class="fieldDescription">Number of TV shows to flag as Leaving Soon (default: 25)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonMinAgeDays">Minimum Item Age (days):</label>
+                                <input is="emby-input" type="number" id="leavingSoonMinAgeDays" name="leavingSoonMinAgeDays" min="0" max="3650" />
+                                <div class="fieldDescription">Items added within this many days are excluded from flagging (default: 180)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonDwellDays">Dwell Period (days):</label>
+                                <input is="emby-input" type="number" id="leavingSoonDwellDays" name="leavingSoonDwellDays" min="1" max="365" />
+                                <div class="fieldDescription">Days before Leaving Soon items move to Removal Candidates (default: 30)</div>
+                            </div>
+                        </div>
+
                         <br/>
                         <button is="emby-button" type="submit" class="raised button-submit block">
                             <span>Save</span>
@@ -216,50 +252,101 @@
                 },
                 
                 /**
-                 * Loads setup paths from backend API.
+                 * Loads setup paths from backend API (user paths and shared Leaving Soon paths).
                  */
                 loadSetupStatus: function(page) {
                     var self = this;
                     var container = page.querySelector('#setupStatusContainer');
                     container.innerHTML = '<p>Loading library paths...</p>';
-                    
-                    ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Setup/Paths'))
-                        .then(function(users) {
-                            if (!users || users.length === 0) {
-                                container.innerHTML = '<p>No users found. Create users in Jellyfin first, then refresh this page.</p>';
-                                return;
-                            }
-                            
-                            // Check if all libraries are created
+
+                    Promise.all([
+                        ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Setup/Paths')),
+                        ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Setup/SharedPaths')).catch(function() { return null; })
+                    ]).then(function(results) {
+                        var users = results[0];
+                        var sharedPaths = results[1];
+                        var html = '';
+
+                        if (!users || users.length === 0) {
+                            html += '<p>No users found. Create users in Jellyfin first, then refresh this page.</p>';
+                        } else {
                             var allCreated = users.every(function(user) { return user.LibrariesCreated; });
-                            
+
                             if (allCreated) {
-                                container.innerHTML = '<div style="background: rgba(76, 175, 80, 0.1); padding: 1.5em; border-left: 4px solid #4caf50;">' +
-                                    '<h3 style="margin-top: 0;">Setup Complete!</h3>' +
-                                    '<p>All recommendation libraries have been created. No further setup is required.</p>' +
+                                html += '<div style="background: rgba(76, 175, 80, 0.1); padding: 1.5em; border-left: 4px solid #4caf50;">' +
+                                    '<h3 style="margin-top: 0;">User Libraries Ready!</h3>' +
+                                    '<p>All recommendation libraries have been created.</p>' +
                                     '<p>Run the "Refresh Local Recommendations" scheduled task to generate recommendations.</p>' +
                                     '</div>';
-                                return;
+                            } else {
+                                html += '<div class="paperList">';
+                                users.forEach(function(user) {
+                                    html += self.renderUserSetupCard(user);
+                                });
+                                html += '</div>';
+                                html += self.renderNextStepsBox();
                             }
-                            
-                            var html = '<div class="paperList">';
-                            
-                            users.forEach(function(user) {
-                                html += self.renderUserSetupCard(user);
-                            });
-                            
-                            html += '</div>';
-                            html += self.renderNextStepsBox();
-                            
-                            container.innerHTML = html;
-                            
-                            // Add copy button event listeners
-                            self.initCopyButtons(page);
-                        })
-                        .catch(function(error) {
-                            console.error('Failed to load library paths:', error);
-                            container.innerHTML = '<p style="color: #ff5252;">Error loading library paths. Please check that the plugin is properly installed.</p>';
-                        });
+                        }
+
+                        if (sharedPaths && sharedPaths.length > 0) {
+                            html += self.renderSharedLibrariesSection(sharedPaths);
+                        }
+
+                        container.innerHTML = html;
+                        self.initCopyButtons(page);
+                    }).catch(function(error) {
+                        console.error('Failed to load library paths:', error);
+                        container.innerHTML = '<p style="color: #ff5252;">Error loading library paths. Please check that the plugin is properly installed.</p>';
+                    });
+                },
+
+                /**
+                 * Renders the Leaving Soon shared libraries section.
+                 */
+                renderSharedLibrariesSection: function(sharedPaths) {
+                    var self = this;
+                    var html = '<div style="margin-top: 3em;">';
+                    html += '<h2 class="sectionTitle">Leaving Soon Libraries</h2>';
+                    html += '<p>These shared libraries are not per-user. Create them once and configure visibility for the appropriate audience.</p>';
+                    html += '<div class="paperList">';
+
+                    sharedPaths.forEach(function(lib) {
+                        var name = self.escapeHtml(lib.Name);
+                        var path = self.escapeHtml(lib.Path);
+                        var suggestedName = self.escapeHtml(lib.SuggestedLibraryName);
+                        var created = lib.LibraryCreated;
+                        var adminOnly = lib.IsAdminOnly;
+
+                        html += '<div class="listItem" style="margin: 1em 0; padding: 1.5em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">';
+                        html += '<h4 style="margin-top: 0;">' + name;
+                        if (adminOnly) {
+                            html += ' <span style="font-size: 0.75em; color: #ffc107; font-weight: normal;">(admin only)</span>';
+                        }
+                        if (created) {
+                            html += ' <span style="font-size: 0.75em; color: #4caf50; font-weight: normal;">&#10003; Added</span>';
+                        }
+                        html += '</h4>';
+                        html += '<div class="inputContainer">';
+                        html += '<label class="inputLabel inputLabelUnfocused">Folder Path:</label>';
+                        html += '<div style="display: flex; gap: 0.5em; align-items: center;">';
+                        html += '<input type="text" class="emby-input" readonly value="' + path + '" style="flex: 1; font-family: monospace;" />';
+                        html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + path + '" style="min-width: 80px;">Copy</button>';
+                        html += '</div>';
+                        html += '<div class="fieldDescription" style="margin-top: 0.5em;">Suggested Library Name: <strong>' + suggestedName + '</strong></div>';
+                        if (adminOnly) {
+                            html += '<div class="fieldDescription" style="margin-top: 0.25em; color: #ffc107;">Restrict access to administrators in library settings.</div>';
+                        }
+                        html += '</div>';
+                        html += '</div>';
+                    });
+
+                    html += '</div>';
+                    html += '<div style="background: rgba(33,150,243,0.1); padding: 1.5em; margin-top: 1em; border-left: 4px solid #2196f3;">';
+                    html += '<h4 style="margin-top: 0;">Setup Instructions</h4>';
+                    html += '<p>After creating the libraries, enable the Leaving Soon feature in the <strong>Settings</strong> tab and run the recommendation refresh task.</p>';
+                    html += '</div>';
+                    html += '</div>';
+                    return html;
                 },
                 
                 /**
@@ -437,6 +524,12 @@
                             page.querySelector('#enableRatingProximity').checked = config.EnableRatingProximity || false;
                             page.querySelector('#ratingProximityWeight').value = config.RatingProximityWeight || 0.2;
 
+                            page.querySelector('#leavingSoonEnabled').checked = config.LeavingSoonEnabled !== false;
+                            page.querySelector('#leavingSoonMovieCount').value = config.LeavingSoonMovieCount || 25;
+                            page.querySelector('#leavingSoonTvCount').value = config.LeavingSoonTvCount || 25;
+                            page.querySelector('#leavingSoonMinAgeDays').value = config.LeavingSoonMinAgeDays !== undefined ? config.LeavingSoonMinAgeDays : 180;
+                            page.querySelector('#leavingSoonDwellDays').value = config.LeavingSoonDwellDays || 30;
+
                             self.updateFieldVisibility(page);
                             Dashboard.hideLoadingMsg();
                         })
@@ -453,6 +546,10 @@
                     var enableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                     var weightContainer = page.querySelector('#ratingProximityWeightContainer');
                     weightContainer.style.display = enableRatingProximity ? 'block' : 'none';
+
+                    var leavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
+                    var leavingSoonContainer = page.querySelector('#leavingSoonSettingsContainer');
+                    leavingSoonContainer.style.display = leavingSoonEnabled ? 'block' : 'none';
                 },
                 
                 /**
@@ -475,6 +572,12 @@
                             config.MaxVocabularyTags = parseInt(page.querySelector('#maxVocabularyTags').value);
                             config.EnableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                             config.RatingProximityWeight = parseFloat(page.querySelector('#ratingProximityWeight').value);
+
+                            config.LeavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
+                            config.LeavingSoonMovieCount = parseInt(page.querySelector('#leavingSoonMovieCount').value);
+                            config.LeavingSoonTvCount = parseInt(page.querySelector('#leavingSoonTvCount').value);
+                            config.LeavingSoonMinAgeDays = parseInt(page.querySelector('#leavingSoonMinAgeDays').value);
+                            config.LeavingSoonDwellDays = parseInt(page.querySelector('#leavingSoonDwellDays').value);
 
                             return ApiClient.updatePluginConfiguration(self.pluginId, config);
                         })
@@ -582,6 +685,10 @@
                 
                 // Setup event listeners for settings
                 page.querySelector('#enableRatingProximity').addEventListener('change', function() {
+                    LocalRecsConfig.updateFieldVisibility(page);
+                });
+
+                page.querySelector('#leavingSoonEnabled').addEventListener('change', function() {
                     LocalRecsConfig.updateFieldVisibility(page);
                 });
                 

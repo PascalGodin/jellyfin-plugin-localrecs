@@ -17,7 +17,7 @@ namespace Jellyfin.Plugin.LocalRecs
         /// Plugin build version for diagnostics.
         /// Update this whenever making significant changes.
         /// </summary>
-        public const string BuildVersion = "2025-12-26-v7-cold-start-fix";
+        public const string BuildVersion = "2026-05-18-v8-leaving-soon";
 
         private static readonly Guid _id = new Guid("2d2a8fdf-0593-4258-a83c-31c4b14e0110");
 

@@ -24,6 +24,11 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             MaxVocabularyTags = 500;
             EnableRatingProximity = true;
             RatingProximityWeight = 0.2;
+            LeavingSoonEnabled = true;
+            LeavingSoonMovieCount = 25;
+            LeavingSoonTvCount = 25;
+            LeavingSoonMinAgeDays = 180;
+            LeavingSoonDwellDays = 30;
         }
 
         /// <summary>
@@ -85,6 +90,32 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         public double RatingProximityWeight { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the Leaving Soon feature is enabled.
+        /// </summary>
+        public bool LeavingSoonEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of movies to flag in Leaving Soon.
+        /// </summary>
+        public int LeavingSoonMovieCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of TV series to flag in Leaving Soon.
+        /// </summary>
+        public int LeavingSoonTvCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the minimum age in days an item must be in the library before it can be flagged.
+        /// Prevents recently-added items from immediately appearing in Leaving Soon.
+        /// </summary>
+        public int LeavingSoonMinAgeDays { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of days an item stays in Leaving Soon before being promoted to Removal Candidates.
+        /// </summary>
+        public int LeavingSoonDwellDays { get; set; }
+
+        /// <summary>
         /// Validates the configuration and returns validation errors.
         /// </summary>
         /// <returns>List of validation error messages, empty if valid.</returns>
@@ -140,6 +171,26 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             if (RatingProximityWeight < 0 || RatingProximityWeight > 1)
             {
                 errors.Add("RatingProximityWeight must be between 0.0 and 1.0");
+            }
+
+            if (LeavingSoonMovieCount < 0)
+            {
+                errors.Add("LeavingSoonMovieCount must be non-negative");
+            }
+
+            if (LeavingSoonTvCount < 0)
+            {
+                errors.Add("LeavingSoonTvCount must be non-negative");
+            }
+
+            if (LeavingSoonMinAgeDays < 0)
+            {
+                errors.Add("LeavingSoonMinAgeDays must be non-negative");
+            }
+
+            if (LeavingSoonDwellDays <= 0)
+            {
+                errors.Add("LeavingSoonDwellDays must be positive");
             }
 
             return errors;

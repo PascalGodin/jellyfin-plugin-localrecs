@@ -133,14 +133,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         }
 
         /// <summary>
-        /// Generates recommendations for multiple users efficiently.
-        /// Computes embeddings once and reuses them for all users.
+        /// Generates recommendations for multiple users using pre-computed embeddings.
+        /// Call <see cref="ComputeEmbeddings"/> first and pass the results here so they can
+        /// also be forwarded to other services (e.g. LeavingSoonService) without re-computation.
         /// </summary>
         /// <param name="userIds">List of user IDs to process.</param>
+        /// <param name="embeddings">Pre-computed item embeddings.</param>
+        /// <param name="metadata">Pre-computed item metadata.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <returns>Dictionary mapping user IDs to their recommendations (movies, TV).</returns>
         public Task<Dictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)>> GenerateRecommendationsForMultipleUsersAsync(
             IReadOnlyList<Guid> userIds,
+            IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
+            IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
             PluginConfiguration config)
         {
             var results = new Dictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)>();
@@ -152,9 +157,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             _logger.LogInformation("Generating recommendations for {Count} users", userIds.Count);
 
-            // Compute embeddings once for all users
-            var (embeddings, metadata) = ComputeEmbeddings();
-
             foreach (var userId in userIds)
             {
                 var recs = GenerateRecommendationsForUser(userId, embeddings, metadata, config);
@@ -164,6 +166,21 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger.LogInformation("Successfully generated recommendations for {Count}/{Total} users", results.Count, userIds.Count);
 
             return Task.FromResult(results);
+        }
+
+        /// <summary>
+        /// Generates recommendations for multiple users efficiently.
+        /// Computes embeddings once and reuses them for all users.
+        /// </summary>
+        /// <param name="userIds">List of user IDs to process.</param>
+        /// <param name="config">Plugin configuration.</param>
+        /// <returns>Dictionary mapping user IDs to their recommendations (movies, TV).</returns>
+        public Task<Dictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)>> GenerateRecommendationsForMultipleUsersAsync(
+            IReadOnlyList<Guid> userIds,
+            PluginConfiguration config)
+        {
+            var (embeddings, metadata) = ComputeEmbeddings();
+            return GenerateRecommendationsForMultipleUsersAsync(userIds, embeddings, metadata, config);
         }
     }
 }

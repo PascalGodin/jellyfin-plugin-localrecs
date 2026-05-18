@@ -84,7 +84,23 @@ namespace Jellyfin.Plugin.LocalRecs
                     sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<UserDeletedEventHandler>>(),
                     sp.GetRequiredService<VirtualLibraryManager>()));
 
-            // Phase 8: Scheduled Tasks
+            // Phase 8: Leaving Soon Service
+            serviceCollection.AddSingleton(sp =>
+            {
+                var pluginDataPath = Path.Combine(
+                    sp.GetRequiredService<IApplicationPaths>().PluginsPath,
+                    "LocalRecs");
+                return new LeavingSoonService(
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LeavingSoonService>>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserManager>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserDataManager>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.ILibraryManager>(),
+                    sp.GetRequiredService<UserProfileService>(),
+                    sp.GetRequiredService<VirtualLibraryManager>(),
+                    pluginDataPath);
+            });
+
+            // Phase 9: Scheduled Tasks
             serviceCollection.AddTransient<IScheduledTask, RecommendationRefreshTask>();
             serviceCollection.AddTransient<IScheduledTask, BenchmarkTask>();
         }

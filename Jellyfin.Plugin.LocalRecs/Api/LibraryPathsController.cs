@@ -92,6 +92,66 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         }
 
         /// <summary>
+        /// Gets the four shared Leaving Soon / Removal Candidates virtual library paths.
+        /// </summary>
+        /// <returns>List of shared library path information.</returns>
+        [HttpGet("Setup/SharedPaths")]
+        public ActionResult<List<SharedLibraryPathInfo>> GetSharedPaths()
+        {
+            try
+            {
+                var virtualFolders = _libraryManager.GetVirtualFolders();
+
+                bool LibraryExists(string path) =>
+                    virtualFolders.Any(vf => vf.Locations.Any(loc =>
+                        loc.Equals(path, StringComparison.OrdinalIgnoreCase)));
+
+                var paths = new List<SharedLibraryPathInfo>
+                {
+                    new SharedLibraryPathInfo
+                    {
+                        Name = "Leaving Soon (Movies)",
+                        Path = _virtualLibraryManager.LeavingSoonMoviesPath,
+                        SuggestedLibraryName = "Leaving Soon — Movies",
+                        LibraryCreated = LibraryExists(_virtualLibraryManager.LeavingSoonMoviesPath),
+                        IsAdminOnly = false
+                    },
+                    new SharedLibraryPathInfo
+                    {
+                        Name = "Leaving Soon (TV Shows)",
+                        Path = _virtualLibraryManager.LeavingSoonTvPath,
+                        SuggestedLibraryName = "Leaving Soon — TV Shows",
+                        LibraryCreated = LibraryExists(_virtualLibraryManager.LeavingSoonTvPath),
+                        IsAdminOnly = false
+                    },
+                    new SharedLibraryPathInfo
+                    {
+                        Name = "Removal Candidates (Movies)",
+                        Path = _virtualLibraryManager.RemovalCandidatesMoviesPath,
+                        SuggestedLibraryName = "Removal Candidates — Movies",
+                        LibraryCreated = LibraryExists(_virtualLibraryManager.RemovalCandidatesMoviesPath),
+                        IsAdminOnly = true
+                    },
+                    new SharedLibraryPathInfo
+                    {
+                        Name = "Removal Candidates (TV Shows)",
+                        Path = _virtualLibraryManager.RemovalCandidatesTvPath,
+                        SuggestedLibraryName = "Removal Candidates — TV Shows",
+                        LibraryCreated = LibraryExists(_virtualLibraryManager.RemovalCandidatesTvPath),
+                        IsAdminOnly = true
+                    }
+                };
+
+                return Ok(paths);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get shared library paths");
+                return StatusCode(500, "Failed to retrieve shared library paths");
+            }
+        }
+
+        /// <summary>
         /// Gets the latest benchmark results.
         /// </summary>
         /// <returns>Benchmark results as plain text.</returns>

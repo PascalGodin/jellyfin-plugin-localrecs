@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         private readonly IUserManager _userManager;
         private readonly RecommendationRefreshService _refreshService;
         private readonly VirtualLibraryManager _virtualLibraryManager;
+        private readonly LeavingSoonService _leavingSoonService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationRefreshTask"/> class.
@@ -31,16 +32,19 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         /// <param name="userManager">User manager.</param>
         /// <param name="refreshService">Recommendation refresh service.</param>
         /// <param name="virtualLibraryManager">Virtual library manager.</param>
+        /// <param name="leavingSoonService">Leaving Soon service.</param>
         public RecommendationRefreshTask(
             ILogger<RecommendationRefreshTask> logger,
             IUserManager userManager,
             RecommendationRefreshService refreshService,
-            VirtualLibraryManager virtualLibraryManager)
+            VirtualLibraryManager virtualLibraryManager,
+            LeavingSoonService leavingSoonService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _refreshService = refreshService ?? throw new ArgumentNullException(nameof(refreshService));
             _virtualLibraryManager = virtualLibraryManager ?? throw new ArgumentNullException(nameof(virtualLibraryManager));
+            _leavingSoonService = leavingSoonService ?? throw new ArgumentNullException(nameof(leavingSoonService));
         }
 
         /// <inheritdoc />
@@ -79,11 +83,25 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                     return;
                 }
 
-                // Step 2: Generate recommendations for all users (5-80% progress)
+                // Step 2: Compute embeddings once (shared by recommendations and Leaving Soon)
                 var userIds = users.Select(u => u.Id).ToList();
+                var (embeddings, metadata) = _refreshService.ComputeEmbeddings();
+                var allItems = metadata.Values.ToList();
+
                 var userRecommendations = await _refreshService.GenerateRecommendationsForMultipleUsersAsync(
                     userIds,
+                    embeddings,
+                    metadata,
                     config).ConfigureAwait(false);
+
+                progress?.Report(75);
+
+                // Step 2b: Leaving Soon refresh (70-80% progress)
+                if (config.LeavingSoonEnabled)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _leavingSoonService.RefreshAsync(allItems, embeddings, config, cancellationToken).ConfigureAwait(false);
+                }
 
                 progress?.Report(80);
 
