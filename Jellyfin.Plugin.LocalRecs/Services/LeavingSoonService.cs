@@ -404,6 +404,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             PluginConfiguration config)
         {
+            if (embeddings.Count == 0)
+            {
+                return Array.Empty<UserProfile>();
+            }
+
             var profiles = new List<UserProfile>();
 
             foreach (var user in users)
