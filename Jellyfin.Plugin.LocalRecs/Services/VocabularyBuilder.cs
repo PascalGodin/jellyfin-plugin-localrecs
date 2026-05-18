@@ -129,16 +129,41 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 vocabulary.SetDecadeIdf(decade.Key, idf);
             }
 
+            // Build collection vocabulary and document frequencies
+            var collectionDocCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in itemList)
+            {
+                if (!string.IsNullOrWhiteSpace(item.CollectionName))
+                {
+                    if (collectionDocCounts.ContainsKey(item.CollectionName))
+                    {
+                        collectionDocCounts[item.CollectionName]++;
+                    }
+                    else
+                    {
+                        collectionDocCounts[item.CollectionName] = 1;
+                    }
+                }
+            }
+
+            foreach (var collection in collectionDocCounts)
+            {
+                vocabulary.AddCollection(collection.Key, collection.Value);
+                var idf = ComputeIdf(itemList.Count, collection.Value);
+                vocabulary.SetCollectionIdf(collection.Key, idf);
+            }
+
             // Set metadata
             vocabulary.TotalItems = itemList.Count;
 
             _logger.LogDebug(
-                "Built vocabulary: {GenreCount} genres, {ActorCount} actors, {DirectorCount} directors, {TagCount} tags, {DecadeCount} decades",
+                "Built vocabulary: {GenreCount} genres, {ActorCount} actors, {DirectorCount} directors, {TagCount} tags, {DecadeCount} decades, {CollectionCount} collections",
                 vocabulary.Genres.Count,
                 vocabulary.Actors.Count,
                 vocabulary.Directors.Count,
                 vocabulary.Tags.Count,
-                vocabulary.Decades.Count);
+                vocabulary.Decades.Count,
+                vocabulary.Collections.Count);
 
             return vocabulary;
         }

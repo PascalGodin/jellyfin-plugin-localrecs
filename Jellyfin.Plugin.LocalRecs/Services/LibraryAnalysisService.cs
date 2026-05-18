@@ -44,6 +44,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             {
                 var items = new List<MediaItemMetadata>();
 
+                // Build BoxSet (collection) membership lookup
+                var itemToCollection = BuildCollectionLookup();
+
                 // Get all movies
                 var movies = _libraryManager.GetItemList(new InternalItemsQuery
                 {
@@ -57,6 +60,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     var metadata = ConvertToMetadata(movie, Models.MediaType.Movie);
                     if (metadata != null)
                     {
+                        if (itemToCollection.TryGetValue(movie.Id, out var collectionName))
+                        {
+                            metadata.CollectionName = collectionName;
+                        }
+
                         items.Add(metadata);
                     }
                 }
@@ -74,6 +82,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     var metadata = ConvertToMetadata(show, Models.MediaType.Series);
                     if (metadata != null)
                     {
+                        if (itemToCollection.TryGetValue(show.Id, out var collectionName))
+                        {
+                            metadata.CollectionName = collectionName;
+                        }
+
                         items.Add(metadata);
                     }
                 }
@@ -120,6 +133,64 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 _logger.LogError(ex, "Error retrieving media item {ItemId}", itemId);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Builds a lookup from item ID to BoxSet collection name using LinkedChildren.
+        /// </summary>
+        /// <returns>Dictionary mapping item Guid to collection name.</returns>
+        private Dictionary<Guid, string> BuildCollectionLookup()
+        {
+            var lookup = new Dictionary<Guid, string>();
+
+            try
+            {
+                var boxSets = _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    IncludeItemTypes = new[] { BaseItemKind.BoxSet },
+                    Recursive = true
+                });
+
+                _logger.LogDebug("Found {Count} BoxSets for collection lookup", boxSets.Count);
+
+                foreach (var boxSetItem in boxSets)
+                {
+                    if (string.IsNullOrWhiteSpace(boxSetItem.Name))
+                    {
+                        continue;
+                    }
+
+                    if (boxSetItem is not Folder boxSetFolder)
+                    {
+                        continue;
+                    }
+
+                    var linkedChildren = boxSetFolder.LinkedChildren;
+                    if (linkedChildren == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var linkedChild in linkedChildren)
+                    {
+                        if (linkedChild.ItemId.HasValue)
+                        {
+                            lookup[linkedChild.ItemId.Value] = boxSetItem.Name;
+                        }
+                    }
+                }
+
+                _logger.LogDebug(
+                    "Built collection lookup: {BoxSetCount} BoxSets, {ItemCount} items mapped",
+                    boxSets.Count,
+                    lookup.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to build collection lookup; collection features will be unavailable");
+            }
+
+            return lookup;
         }
 
         /// <summary>

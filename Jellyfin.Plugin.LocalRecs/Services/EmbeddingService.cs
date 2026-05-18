@@ -82,11 +82,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 throw new ArgumentNullException(nameof(vocabulary));
             }
 
-            // Dimensions: genres + actors + directors + tags + decades + ratings (2)
+            // Dimensions: genres + actors + directors + tags + collections + decades + ratings (2)
             return vocabulary.Genres.Count +
                    vocabulary.Actors.Count +
                    vocabulary.Directors.Count +
                    vocabulary.Tags.Count +
+                   vocabulary.Collections.Count +
                    vocabulary.Decades.Count +
                    2; // community rating + critic rating
         }
@@ -114,6 +115,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var actorVector = ComputeTfIdfVector(item.Actors, vocabulary.ActorIdf);
             var directorVector = ComputeTfIdfVector(item.Directors, vocabulary.DirectorIdf);
             var tagVector = ComputeTfIdfVector(item.Tags, vocabulary.TagIdf);
+            var collectionVector = ComputeCollectionVector(item.CollectionName, vocabulary.CollectionIdf);
             var decadeVector = ComputeDecadeVector(item.Decade, vocabulary.DecadeIdf);
 
             // Compute normalized rating features
@@ -125,6 +127,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 actorVector,
                 directorVector,
                 tagVector,
+                collectionVector,
                 decadeVector,
                 ratingFeatures);
 
@@ -182,6 +185,30 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 : 0.5f; // Default to middle value if unknown
 
             return new[] { communityRating, criticRating };
+        }
+
+        /// <summary>
+        /// Computes TF-IDF vector for a single collection feature.
+        /// </summary>
+        /// <param name="collectionName">The collection the item belongs to, or null.</param>
+        /// <param name="idfValues">IDF values for each collection in vocabulary.</param>
+        /// <returns>TF-IDF vector.</returns>
+        private float[] ComputeCollectionVector(string? collectionName, IReadOnlyDictionary<string, float> idfValues)
+        {
+            var vector = new float[idfValues.Count];
+            var index = 0;
+
+            foreach (var (vocabCollection, idf) in idfValues)
+            {
+                var tf = collectionName != null &&
+                         string.Equals(collectionName, vocabCollection, StringComparison.OrdinalIgnoreCase)
+                    ? 1.0f
+                    : 0.0f;
+                vector[index] = tf * idf;
+                index++;
+            }
+
+            return vector;
         }
 
         /// <summary>

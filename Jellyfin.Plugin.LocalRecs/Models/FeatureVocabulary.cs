@@ -19,6 +19,7 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         private readonly Dictionary<string, float> _directorIdf;
         private readonly Dictionary<string, float> _tagIdf;
         private readonly Dictionary<string, float> _decadeIdf;
+        private readonly Dictionary<string, float> _collectionIdf;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FeatureVocabulary"/> class.
@@ -36,6 +37,7 @@ namespace Jellyfin.Plugin.LocalRecs.Models
             _directorIdf = new Dictionary<string, float>();
             _tagIdf = new Dictionary<string, float>();
             _decadeIdf = new Dictionary<string, float>();
+            _collectionIdf = new Dictionary<string, float>();
         }
 
         /// <summary>
@@ -92,6 +94,11 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         /// Gets the IDF values for decades.
         /// </summary>
         public IReadOnlyDictionary<string, float> DecadeIdf => _decadeIdf;
+
+        /// <summary>
+        /// Gets the IDF values for collections.
+        /// </summary>
+        public IReadOnlyDictionary<string, float> CollectionIdf => _collectionIdf;
 
         /// <summary>
         /// Gets or sets the total number of items in the library.
@@ -185,5 +192,12 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         /// <param name="decade">The decade name.</param>
         /// <param name="idf">The IDF value.</param>
         public void SetDecadeIdf(string decade, float idf) => _decadeIdf[decade] = idf;
+
+        /// <summary>
+        /// Sets the IDF value for a collection.
+        /// </summary>
+        /// <param name="collection">The collection name.</param>
+        /// <param name="idf">The IDF value.</param>
+        public void SetCollectionIdf(string collection, float idf) => _collectionIdf[collection] = idf;
     }
 }
