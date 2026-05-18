@@ -12,7 +12,7 @@
         "changelog": "Add Leaving Soon and Removal Candidates virtual libraries\n- Items least likely to be watched by any user are flagged as Leaving Soon\n- After a configurable dwell period, flagged items move to Removal Candidates\n- Collection sibling protection: if any member of a franchise is saved, all siblings are protected\n- Pre-computed embeddings shared between recommendations and Leaving Soon scoring\n- Configurable: enable/disable, item count (movies + TV), minimum age, dwell period\n- Fix: meta.MediaType compilation error in LeavingSoonService and VirtualLibraryManager",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.0/jellyfin-plugin-localrecs-v0.8.0.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "20c142ed2ab9ffaa0a442facf783cf1f",
         "timestamp": "2026-05-18T20:00:00Z"
       },
       {
