@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.8.4.0",
+        "changelog": "Fix Leaving Soon: recently-added items, orphaned episode entries, and CI reliability\n- Fix: items recently added to library (within minAgeDays) are now removed from Leaving Soon state\n- Fix: stale state IDs that resolve to Episode/Season items are skipped in sync\n- Fix: test for Cleanup semantics updated to match interaction-based age logic",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.4/jellyfin-plugin-localrecs-v0.8.4.zip",
+        "checksum": "",
+        "timestamp": "2026-05-19T02:00:00Z"
+      },
+      {
         "version": "0.8.3.0",
         "changelog": "Fix Leaving Soon: recently-added items and orphaned episode entries\n- Fix: items recently added to library (within minAgeDays) are now removed from Leaving Soon state, matching Discover eligibility logic\n- Fix: stale state IDs that resolve to Episode/Season items are skipped in sync instead of creating orphaned episode cards in the library",
         "targetAbi": "10.11.0.0",
