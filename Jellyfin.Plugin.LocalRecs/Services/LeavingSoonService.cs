@@ -257,7 +257,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 // Effective age = min(time since added, time since last watched by any user).
                 // Remove from state if too recent — mirrors the Discover eligibility check.
-                var timeSinceAdded = now - item.DateCreated;
+                // For series, DateLastMediaAdded reflects the most recent episode addition (more accurate than folder ctime).
+                var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
+                var timeSinceAdded = now - addedDate;
                 DateTime? latestWatchDate = null;
                 foreach (var user in users)
                 {
@@ -387,7 +389,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                     // Effective age = min(time since added to library, time since last watched by any user).
                     // Items recently added OR recently watched by any user are skipped.
-                    var timeSinceAdded = now - item.DateCreated;
+                    // For series, DateLastMediaAdded reflects the most recent episode addition (more accurate than folder ctime).
+                    var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
+                    var timeSinceAdded = now - addedDate;
 
                     DateTime? latestWatchDate = null;
                     foreach (var user in users)
@@ -562,48 +566,13 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         }
 
         /// <summary>
-        /// Returns the most recent date the item was last played by the given user.
-        /// For series, falls back to checking episode-level play dates.
+        /// Returns the date the item was last played by the given user.
+        /// Jellyfin propagates LastPlayedDate to Season/Series when any episode is played,
+        /// so series-level UserData is sufficient without enumerating episodes.
         /// </summary>
         private DateTime? GetLastWatchDate(BaseItem item, User user)
         {
-            var userData = _userDataManager.GetUserData(user, item);
-            if (userData?.LastPlayedDate != null)
-            {
-                return userData.LastPlayedDate;
-            }
-
-            if (item is Series series)
-            {
-                return GetSeriesLastWatchDate(series, user);
-            }
-
-            return null;
-        }
-
-        private DateTime? GetSeriesLastWatchDate(Series series, User user)
-        {
-            var episodes = _libraryManager.GetItemList(new InternalItemsQuery
-            {
-                ParentId = series.Id,
-                IncludeItemTypes = new[] { BaseItemKind.Episode },
-                Recursive = true
-            });
-
-            DateTime? latest = null;
-            foreach (var ep in episodes)
-            {
-                var epData = _userDataManager.GetUserData(user, ep);
-                if (epData?.LastPlayedDate != null)
-                {
-                    if (latest == null || epData.LastPlayedDate.Value > latest.Value)
-                    {
-                        latest = epData.LastPlayedDate.Value;
-                    }
-                }
-            }
-
-            return latest;
+            return _userDataManager.GetUserData(user, item)?.LastPlayedDate;
         }
 
         private LeavingSoonState LoadState()

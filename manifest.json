@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.8.6.0",
+        "changelog": "Simplify Leaving Soon age semantics for TV series\n- For series, timeSinceAdded now uses DateLastMediaAdded (most recent episode addition) instead of folder ctime\n- A show that had a new season added recently is correctly treated as new, even if the series folder is old\n- Removed episode-level enumeration fallback in GetLastWatchDate: Jellyfin propagates LastPlayedDate to Series when any episode is watched, so series-level UserData is sufficient",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.6/jellyfin-plugin-localrecs-v0.8.6.zip",
+        "checksum": "",
+        "timestamp": "2026-05-19T04:00:00Z"
+      },
+      {
         "version": "0.8.5.0",
         "changelog": "Fix TV show virtual libraries: use series folder symlinks instead of per-episode symlinks\n- Fix: shows appeared as single orphaned episode cards (Jellyfin matched per-episode symlinks back to source library items)\n- Series folders are now a single directory symlink to the source series folder\n- Jellyfin discovers all episodes naturally; no more filename collisions or path-length limits\n- Applies to both Leaving Soon Shows and per-user TV recommendation libraries",
         "targetAbi": "10.11.0.0",
