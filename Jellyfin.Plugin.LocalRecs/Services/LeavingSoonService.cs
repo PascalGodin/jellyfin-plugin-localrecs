@@ -339,7 +339,18 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         continue;
                     }
 
-                    if (item.DateCreated != DateTime.MinValue && (now - item.DateCreated) < minAge)
+                    // For series, DateCreated is the folder ctime which resets on every
+                    // move/copy on most Linux filesystems — use PremiereDate as a reliable
+                    // lower bound, so a show that aired years ago isn't blocked by a
+                    // recently-reset folder timestamp.
+                    var ageReference = item.DateCreated;
+                    if (meta.Type == MediaType.Series && item.PremiereDate.HasValue
+                        && item.PremiereDate.Value < ageReference)
+                    {
+                        ageReference = item.PremiereDate.Value;
+                    }
+
+                    if (ageReference != DateTime.MinValue && (now - ageReference) < minAge)
                     {
                         continue;
                     }
@@ -423,12 +434,13 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            _logger.LogDebug(
-                "Leaving Soon discovery: scored {MovieCandidates} movie candidates and {TvCandidates} TV candidates, flagged {Flagged} new items, evicted {Evicted} items no longer in target set",
+            _logger.LogInformation(
+                "Leaving Soon discovery: {MovieCandidates} movie candidates, {TvCandidates} TV candidates — flagged {Flagged} new, evicted {Evicted} (total flagged: {FlaggedTotal})",
                 scoredMovies.Count,
                 scoredTv.Count,
                 flagged,
-                evicted.Count);
+                evicted.Count,
+                state.FlaggedItems.Count);
         }
 
         /// <summary>
