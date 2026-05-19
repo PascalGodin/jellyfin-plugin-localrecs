@@ -12,7 +12,7 @@
         "changelog": "Simplify Leaving Soon age semantics for TV series\n- For series, timeSinceAdded now uses DateLastMediaAdded (most recent episode addition) instead of folder ctime\n- A show that had a new season added recently is correctly treated as new, even if the series folder is old\n- Removed episode-level enumeration fallback in GetLastWatchDate: Jellyfin propagates LastPlayedDate to Series when any episode is watched, so series-level UserData is sufficient",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.6/jellyfin-plugin-localrecs-v0.8.6.zip",
-        "checksum": "",
+        "checksum": "26b3a50c85b650d5a8a874c3470bd722",
         "timestamp": "2026-05-19T04:00:00Z"
       },
       {
