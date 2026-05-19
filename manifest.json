@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.8.2.0",
+        "changelog": "Leaving Soon: interaction-based age semantics\n- Age is now min(time since added to library, time since last watched by any user)\n- Items recently rewatched are excluded, regardless of how old the content is\n- For TV series, last-watched is the most recent episode watch date across all users\n- Favorites and in-progress items remain always protected",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.2/jellyfin-plugin-localrecs-v0.8.2.zip",
+        "checksum": "",
+        "timestamp": "2026-05-19T00:00:00Z"
+      },
+      {
         "version": "0.8.1.0",
         "changelog": "Fix Leaving Soon bugs and CI test reliability\n- Fix: reducing Leaving Soon count now takes effect immediately (count was not enforced on reduction)\n- Fix: TV series now appear in Leaving Soon libraries (DateCreated is folder ctime on Linux; PremiereDate used as age reference for series)\n- Fix: non-deterministic test embeddings caused intermittent CI failures",
         "targetAbi": "10.11.0.0",

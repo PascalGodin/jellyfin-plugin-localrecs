@@ -99,9 +99,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var users = _userManager.Users.ToList();
             var allItemsById = BuildItemIndex(allItems);
 
+            var now = DateTime.UtcNow;
+            var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
+
             // Pass 1: Remove saved, deleted, or collection-protected items
             var safeCollections = BuildSafeCollections(allItems, users);
-            Cleanup(state, allItemsById, users, safeCollections);
+            Cleanup(state, allItemsById, users, safeCollections, minAge, now);
             cancellationToken.ThrowIfCancellationRequested();
 
             // Pass 2: Promote items that have exceeded the dwell period
@@ -112,7 +115,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var eligibleProfiles = BuildEligibleProfiles(users, embeddings, config);
             if (eligibleProfiles.Count > 0)
             {
-                Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, users, config);
+                Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, users, config, minAge, now);
             }
             else
             {
@@ -195,7 +198,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             LeavingSoonState state,
             Dictionary<string, MediaItemMetadata> allItemsById,
             IReadOnlyList<User> users,
-            HashSet<string> safeCollections)
+            HashSet<string> safeCollections,
+            TimeSpan minAge,
+            DateTime now)
         {
             var toRemove = new List<string>();
 
@@ -235,7 +240,22 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 var saved = false;
                 foreach (var user in users)
                 {
-                    if (IsItemSafeForUser(item, user))
+                    var ud = _userDataManager.GetUserData(user, item);
+                    if (ud == null)
+                    {
+                        continue;
+                    }
+
+                    // Favorites and in-progress items are always protected.
+                    if (ud.IsFavorite || ud.PlaybackPositionTicks > 0)
+                    {
+                        saved = true;
+                        break;
+                    }
+
+                    // Items watched recently (within minAge) are protected.
+                    var lastWatched = GetLastWatchDate(item, user);
+                    if (lastWatched.HasValue && (now - lastWatched.Value) < minAge)
                     {
                         saved = true;
                         break;
@@ -292,11 +312,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyList<UserProfile> eligibleProfiles,
             HashSet<string> safeCollections,
             IReadOnlyList<User> users,
-            PluginConfiguration config)
+            PluginConfiguration config,
+            TimeSpan minAge,
+            DateTime now)
         {
-            var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
-            var now = DateTime.UtcNow;
-
             var scoredMovies = new List<(string Id, float Score)>();
             var scoredTv = new List<(string Id, float Score)>();
 
@@ -339,33 +358,42 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         continue;
                     }
 
-                    // For series, DateCreated is the folder ctime which resets on every
-                    // move/copy on most Linux filesystems — use PremiereDate as a reliable
-                    // lower bound, so a show that aired years ago isn't blocked by a
-                    // recently-reset folder timestamp.
-                    var ageReference = item.DateCreated;
-                    if (meta.Type == MediaType.Series && item.PremiereDate.HasValue
-                        && item.PremiereDate.Value < ageReference)
-                    {
-                        ageReference = item.PremiereDate.Value;
-                    }
-
-                    if (ageReference != DateTime.MinValue && (now - ageReference) < minAge)
-                    {
-                        continue;
-                    }
-
-                    var interacted = false;
+                    // Favorites and in-progress items are always protected.
+                    var alwaysSafe = false;
                     foreach (var user in users)
                     {
-                        if (IsItemSafeForUser(item, user))
+                        var ud = _userDataManager.GetUserData(user, item);
+                        if (ud != null && (ud.IsFavorite || ud.PlaybackPositionTicks > 0))
                         {
-                            interacted = true;
+                            alwaysSafe = true;
                             break;
                         }
                     }
 
-                    if (interacted)
+                    if (alwaysSafe)
+                    {
+                        continue;
+                    }
+
+                    // Effective age = min(time since added to library, time since last watched by any user).
+                    // Items recently added OR recently watched by any user are skipped.
+                    var timeSinceAdded = now - item.DateCreated;
+
+                    DateTime? latestWatchDate = null;
+                    foreach (var user in users)
+                    {
+                        var watchDate = GetLastWatchDate(item, user);
+                        if (watchDate.HasValue && (latestWatchDate == null || watchDate.Value > latestWatchDate.Value))
+                        {
+                            latestWatchDate = watchDate.Value;
+                        }
+                    }
+
+                    var effectiveAge = latestWatchDate.HasValue
+                        ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - latestWatchDate.Value).Ticks))
+                        : timeSinceAdded;
+
+                    if (effectiveAge < minAge)
                     {
                         continue;
                     }
@@ -521,6 +549,51 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Returns the most recent date the item was last played by the given user.
+        /// For series, falls back to checking episode-level play dates.
+        /// </summary>
+        private DateTime? GetLastWatchDate(BaseItem item, User user)
+        {
+            var userData = _userDataManager.GetUserData(user, item);
+            if (userData?.LastPlayedDate != null)
+            {
+                return userData.LastPlayedDate;
+            }
+
+            if (item is Series series)
+            {
+                return GetSeriesLastWatchDate(series, user);
+            }
+
+            return null;
+        }
+
+        private DateTime? GetSeriesLastWatchDate(Series series, User user)
+        {
+            var episodes = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                ParentId = series.Id,
+                IncludeItemTypes = new[] { BaseItemKind.Episode },
+                Recursive = true
+            });
+
+            DateTime? latest = null;
+            foreach (var ep in episodes)
+            {
+                var epData = _userDataManager.GetUserData(user, ep);
+                if (epData?.LastPlayedDate != null)
+                {
+                    if (latest == null || epData.LastPlayedDate.Value > latest.Value)
+                    {
+                        latest = epData.LastPlayedDate.Value;
+                    }
+                }
+            }
+
+            return latest;
         }
 
         private LeavingSoonState LoadState()
