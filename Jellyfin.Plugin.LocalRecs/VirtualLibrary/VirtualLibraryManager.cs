@@ -232,6 +232,16 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                     {
                         CreateSeriesStructure(libraryPath, series);
                     }
+                    else if (item is Episode || item is Season)
+                    {
+                        // Stale state entry: the Guid was reassigned to a TV sub-item after a
+                        // library re-index. Skip to avoid orphaned episode cards in the library.
+                        // Cleanup will purge the stale ID on the next refresh cycle.
+                        _logger.LogWarning(
+                            "Leaving Soon: item {ItemId} resolved to {ItemType} instead of Series or Movie; skipping",
+                            itemId,
+                            item.GetType().Name);
+                    }
                     else
                     {
                         CreateMovieFolderStructure(libraryPath, item);
