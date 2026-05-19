@@ -157,8 +157,10 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         }
 
         [Fact]
-        public async Task RefreshAsync_Cleanup_RemovesItemsPlayedByAnyUser()
+        public async Task RefreshAsync_Cleanup_RemovesItemsRecentlyWatchedByAnyUser()
         {
+            // Under the new age semantics, an item is removed from Leaving Soon only if it was
+            // watched recently (within LeavingSoonMinAgeDays). Being played long ago is not enough.
             var itemId = Guid.NewGuid();
             var meta = CreateMovieMeta(itemId);
 
@@ -173,18 +175,35 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             _mockLibraryManager.Setup(m => m.GetItemById(itemId)).Returns(mockItem.Object);
             _mockUserDataManager
                 .Setup(m => m.GetUserData(user, mockItem.Object))
-                .Returns(new UserItemData { Key = itemId.ToString(), Played = true });
+                .Returns(new UserItemData
+                {
+                    Key = itemId.ToString(),
+                    Played = true,
+                    LastPlayedDate = DateTime.UtcNow.AddDays(-1) // watched yesterday — within minAge
+                });
 
             var service = CreateService();
+
+            // Use a config with a positive minAge so the recency check can trigger
+            var config = new PluginConfiguration
+            {
+                LeavingSoonEnabled = true,
+                LeavingSoonMovieCount = 5,
+                LeavingSoonTvCount = 5,
+                LeavingSoonMinAgeDays = 30,
+                LeavingSoonDwellDays = 30,
+                MinWatchedItemsForPersonalization = 3
+            };
 
             await service.RefreshAsync(
                 new List<MediaItemMetadata> { meta },
                 new Dictionary<Guid, ItemEmbedding>(),
-                _config,
+                config,
                 CancellationToken.None);
 
             var result = ReadState();
-            result.FlaggedItems.Should().NotContainKey(itemId.ToString(), "item was played by a user");
+            result.FlaggedItems.Should().NotContainKey(itemId.ToString(),
+                "item was watched recently (within minAgeDays) so effectiveAge < minAge");
         }
 
         [Fact]
