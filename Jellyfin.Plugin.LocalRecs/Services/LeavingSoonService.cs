@@ -304,8 +304,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             {
                 var id = meta.Id.ToString();
 
-                // Already flagged or in removal
-                if (state.FlaggedItems.ContainsKey(id) || state.RemovalCandidates.ContainsKey(id))
+                // Items already promoted to removal candidates are done — never re-flag
+                if (state.RemovalCandidates.ContainsKey(id))
                 {
                     continue;
                 }
@@ -328,33 +328,36 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                // Age and user-interaction checks require the real item
-                var item = _libraryManager.GetItemById(meta.Id);
-                if (item == null)
+                // Age and interaction checks apply only to new candidates.
+                // Items already in FlaggedItems passed these checks when first flagged,
+                // and the Cleanup pass has already removed any that were interacted with.
+                if (!state.FlaggedItems.ContainsKey(id))
                 {
-                    continue;
-                }
-
-                // Minimum age filter (skip if date unknown, i.e. MinValue)
-                if (item.DateCreated != DateTime.MinValue && (now - item.DateCreated) < minAge)
-                {
-                    continue;
-                }
-
-                // Skip if any user has interacted with it
-                var interacted = false;
-                foreach (var user in users)
-                {
-                    if (IsItemSafeForUser(item, user))
+                    var item = _libraryManager.GetItemById(meta.Id);
+                    if (item == null)
                     {
-                        interacted = true;
-                        break;
+                        continue;
                     }
-                }
 
-                if (interacted)
-                {
-                    continue;
+                    if (item.DateCreated != DateTime.MinValue && (now - item.DateCreated) < minAge)
+                    {
+                        continue;
+                    }
+
+                    var interacted = false;
+                    foreach (var user in users)
+                    {
+                        if (IsItemSafeForUser(item, user))
+                        {
+                            interacted = true;
+                            break;
+                        }
+                    }
+
+                    if (interacted)
+                    {
+                        continue;
+                    }
                 }
 
                 // Score: max cosine similarity across all eligible user taste vectors
@@ -378,22 +381,54 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            // Flag the bottom N by score (lowest similarity = least likely to be watched)
-            var newMovies = scoredMovies.OrderBy(x => x.Score).Take(config.LeavingSoonMovieCount);
-            var newTv = scoredTv.OrderBy(x => x.Score).Take(config.LeavingSoonTvCount);
+            // Compute the target sets: bottom N total (lowest similarity = least likely to be watched).
+            // This is authoritative — if the configured count decreased, excess items are evicted.
+            var targetMovies = scoredMovies
+                .OrderBy(x => x.Score)
+                .Take(config.LeavingSoonMovieCount)
+                .Select(x => x.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var flagged = 0;
-            foreach (var (id, _) in newMovies.Concat(newTv))
+            var targetTv = scoredTv
+                .OrderBy(x => x.Score)
+                .Take(config.LeavingSoonTvCount)
+                .Select(x => x.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // All IDs that were scored (have embeddings and pass filters)
+            var scoredIds = new HashSet<string>(
+                scoredMovies.Select(x => x.Id).Concat(scoredTv.Select(x => x.Id)),
+                StringComparer.OrdinalIgnoreCase);
+
+            // Remove flagged items that were scored but fell outside the target set.
+            // Items with no embedding are left untouched (they'll be cleaned up next cycle
+            // if they remain invalid, or scored once their embedding is computed).
+            var evicted = state.FlaggedItems.Keys
+                .Where(id => scoredIds.Contains(id) && !targetMovies.Contains(id) && !targetTv.Contains(id))
+                .ToList();
+
+            foreach (var id in evicted)
             {
-                state.FlaggedItems[id] = DateTime.UtcNow;
-                flagged++;
+                state.FlaggedItems.Remove(id);
+            }
+
+            // Flag newly-selected items
+            var flagged = 0;
+            foreach (var id in targetMovies.Concat(targetTv))
+            {
+                if (!state.FlaggedItems.ContainsKey(id))
+                {
+                    state.FlaggedItems[id] = DateTime.UtcNow;
+                    flagged++;
+                }
             }
 
             _logger.LogDebug(
-                "Leaving Soon discovery: scored {MovieCandidates} movie candidates and {TvCandidates} TV candidates, flagged {Flagged} new items",
+                "Leaving Soon discovery: scored {MovieCandidates} movie candidates and {TvCandidates} TV candidates, flagged {Flagged} new items, evicted {Evicted} items no longer in target set",
                 scoredMovies.Count,
                 scoredTv.Count,
-                flagged);
+                flagged,
+                evicted.Count);
         }
 
         /// <summary>
