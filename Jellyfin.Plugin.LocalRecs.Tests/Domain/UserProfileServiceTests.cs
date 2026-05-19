@@ -368,13 +368,15 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var embeddings = new Dictionary<Guid, ItemEmbedding>();
             var dimension = 100; // Test dimension
 
-            foreach (var item in library)
+            for (int idx = 0; idx < library.Count; idx++)
             {
+                var item = library[idx];
                 var vector = new float[dimension];
-                // Create a simple test vector (just use item index for variation)
+                // Use library index (not GetHashCode) so embeddings are deterministic and distinct.
+                // String.GetHashCode() is randomized per-process in .NET 5+ and can collide mod 100.
                 for (int i = 0; i < dimension; i++)
                 {
-                    vector[i] = (float)Math.Sin(i + item.Name.GetHashCode() % 100);
+                    vector[i] = (float)Math.Sin(i + (idx * 7.3));
                 }
 
                 // Normalize
