@@ -237,32 +237,42 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                var saved = false;
+                // Favorites and in-progress items are always protected from leaving soon.
+                var alwaysSafe = false;
                 foreach (var user in users)
                 {
                     var ud = _userDataManager.GetUserData(user, item);
-                    if (ud == null)
+                    if (ud != null && (ud.IsFavorite || ud.PlaybackPositionTicks > 0))
                     {
-                        continue;
-                    }
-
-                    // Favorites and in-progress items are always protected.
-                    if (ud.IsFavorite || ud.PlaybackPositionTicks > 0)
-                    {
-                        saved = true;
-                        break;
-                    }
-
-                    // Items watched recently (within minAge) are protected.
-                    var lastWatched = GetLastWatchDate(item, user);
-                    if (lastWatched.HasValue && (now - lastWatched.Value) < minAge)
-                    {
-                        saved = true;
+                        alwaysSafe = true;
                         break;
                     }
                 }
 
-                if (saved)
+                if (alwaysSafe)
+                {
+                    toRemove.Add(id);
+                    continue;
+                }
+
+                // Effective age = min(time since added, time since last watched by any user).
+                // Remove from state if too recent — mirrors the Discover eligibility check.
+                var timeSinceAdded = now - item.DateCreated;
+                DateTime? latestWatchDate = null;
+                foreach (var user in users)
+                {
+                    var wd = GetLastWatchDate(item, user);
+                    if (wd.HasValue && (latestWatchDate == null || wd.Value > latestWatchDate.Value))
+                    {
+                        latestWatchDate = wd.Value;
+                    }
+                }
+
+                var effectiveAge = latestWatchDate.HasValue
+                    ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - latestWatchDate.Value).Ticks))
+                    : timeSinceAdded;
+
+                if (effectiveAge < minAge)
                 {
                     toRemove.Add(id);
                 }
