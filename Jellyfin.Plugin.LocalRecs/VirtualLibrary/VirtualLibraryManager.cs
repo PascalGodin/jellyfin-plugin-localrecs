@@ -2,12 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Jellyfin.Plugin.LocalRecs.Models;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
@@ -20,8 +18,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
     /// </summary>
     public class VirtualLibraryManager
     {
-        private static readonly string[] TrailerSuffixes = { "-trailer", ".trailer", "_trailer" };
-
         private readonly ILogger<VirtualLibraryManager> _logger;
         private readonly ILibraryManager _libraryManager;
         private readonly string _virtualLibraryBasePath;
@@ -351,28 +347,26 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
         private void CreateMovieFolderStructure(string libraryPath, BaseItem item)
         {
-            if (string.IsNullOrEmpty(item.Path))
+            var sourceFolder = Path.GetDirectoryName(item.Path);
+            if (string.IsNullOrEmpty(sourceFolder))
             {
+                _logger.LogDebug("Movie {ItemName} has no parent folder, skipping", item.Name);
                 return;
             }
 
+            // Symlink the entire source movie folder rather than a renamed file symlink.
+            // File symlinks are resolved by Jellyfin's scanner to the source file path, which
+            // causes virtual items to be deduplicated with the source library items and played
+            // back via the source item's path — breaking playback from the virtual library.
+            // A directory symlink keeps the virtual path intact; the OS resolves it at stream time.
             var folderName = GenerateFolderName(item);
-            var movieFolderPath = Path.Combine(libraryPath, folderName);
-            Directory.CreateDirectory(movieFolderPath);
-
-            var extension = Path.GetExtension(item.Path);
-            var mediaLinkPath = Path.Combine(movieFolderPath, folderName + extension);
-            CreateSymlink(mediaLinkPath, item.Path);
-
-            var sourceDir = Path.GetDirectoryName(item.Path);
-            var trailerCount = LinkTrailers(movieFolderPath, folderName, sourceDir);
-            var artworkCount = LinkItemArtwork(movieFolderPath, item);
+            var linkPath = Path.Combine(libraryPath, folderName);
+            Directory.CreateSymbolicLink(linkPath, sourceFolder);
 
             _logger.LogDebug(
-                "Created movie folder: {FolderName} with symlink, {TrailerCount} trailer(s), {ArtworkCount} artwork file(s)",
+                "Created movie folder symlink: {FolderName} -> {SourcePath}",
                 folderName,
-                trailerCount,
-                artworkCount);
+                sourceFolder);
         }
 
         private void CreateSeriesStructure(string libraryPath, Series series)
@@ -398,162 +392,10 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 series.Path);
         }
 
-        /// <summary>
-        /// Creates a symbolic link at <paramref name="linkPath"/> pointing to <paramref name="targetPath"/>.
-        /// On Windows, this requires Administrator privileges or Developer Mode enabled.
-        /// </summary>
-        private void CreateSymlink(string linkPath, string targetPath)
-        {
-            if (File.Exists(linkPath))
-            {
-                File.Delete(linkPath);
-            }
-
-            File.CreateSymbolicLink(linkPath, targetPath);
-        }
-
         private void LogSymlinkPermissionError(UnauthorizedAccessException ex, Guid itemId)
         {
             const string Msg = "Access denied creating symlink for item {ItemId}. On Windows, Jellyfin must run as Administrator or the host must have Developer Mode enabled (Settings > Privacy & security > For developers). See README troubleshooting section.";
             _logger.LogError(ex, Msg, itemId);
-        }
-
-        /// <summary>
-        /// Symlinks trailer files from the source directory. Jellyfin discovers trailers via the
-        /// <c>trailers/</c> subfolder or files with a <c>-trailer</c> suffix; we mirror those.
-        /// </summary>
-        private int LinkTrailers(string targetFolder, string baseFilename, string? sourceDir)
-        {
-            if (string.IsNullOrEmpty(sourceDir) || !Directory.Exists(sourceDir))
-            {
-                return 0;
-            }
-
-            var count = 0;
-
-            try
-            {
-                // trailers/ subfolder: mirror it by name
-                var sourceTrailersDir = Path.Combine(sourceDir, "trailers");
-                if (Directory.Exists(sourceTrailersDir))
-                {
-                    var targetTrailersDir = Path.Combine(targetFolder, "trailers");
-                    Directory.CreateDirectory(targetTrailersDir);
-                    foreach (var trailer in Directory.GetFiles(sourceTrailersDir))
-                    {
-                        var linkPath = Path.Combine(targetTrailersDir, Path.GetFileName(trailer));
-                        TryCreateSymlink(linkPath, trailer);
-                        count++;
-                    }
-                }
-
-                // -trailer suffix siblings: symlink with the movie's baseFilename as prefix
-                var siblingTrailers = Directory.GetFiles(sourceDir)
-                    .Where(f =>
-                    {
-                        var name = Path.GetFileNameWithoutExtension(f);
-                        return TrailerSuffixes.Any(s => name.EndsWith(s, StringComparison.OrdinalIgnoreCase))
-                               || name.Equals("trailer", StringComparison.OrdinalIgnoreCase);
-                    })
-                    .ToList();
-
-                for (var i = 0; i < siblingTrailers.Count; i++)
-                {
-                    var trailer = siblingTrailers[i];
-                    var ext = Path.GetExtension(trailer);
-                    var linkName = siblingTrailers.Count == 1
-                        ? $"{baseFilename}-trailer{ext}"
-                        : $"{baseFilename}-trailer{i + 1}{ext}";
-                    var linkPath = Path.Combine(targetFolder, linkName);
-                    TryCreateSymlink(linkPath, trailer);
-                    count++;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to link trailers from {SourceDir}", sourceDir);
-            }
-
-            return count;
-        }
-
-        /// <summary>
-        /// Symlinks artwork from <see cref="BaseItem.ImageInfos"/> into the target folder using
-        /// standard filenames Jellyfin auto-discovers. Images may be stored either adjacent to
-        /// the media file or in Jellyfin's metadata cache; this uses the item's resolved paths so
-        /// both cases work.
-        /// </summary>
-        private int LinkItemArtwork(string targetFolder, BaseItem item)
-        {
-            // Multiple filenames per image type: Jellyfin's scanner probes conventional names
-            // (folder.jpg, backdrop.jpg) and warns when missing, so we emit those aliases too.
-            var mappings = new (ImageType Type, string Filename)[]
-            {
-                (ImageType.Primary, "poster.jpg"),
-                (ImageType.Primary, "folder.jpg"),
-                (ImageType.Backdrop, "fanart.jpg"),
-                (ImageType.Backdrop, "backdrop.jpg"),
-                (ImageType.Logo, "clearlogo.png"),
-                (ImageType.Thumb, "landscape.jpg"),
-                (ImageType.Banner, "banner.jpg"),
-                (ImageType.Art, "clearart.png"),
-                (ImageType.Disc, "disc.png")
-            };
-
-            var count = 0;
-
-            foreach (var (imageType, filename) in mappings)
-            {
-                string? sourcePath;
-                try
-                {
-                    sourcePath = item.GetImagePath(imageType, 0);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Failed to resolve {ImageType} for {ItemName}", imageType, item.Name);
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
-                {
-                    continue;
-                }
-
-                // Preserve source extension for primary types where it matters
-                var ext = Path.GetExtension(sourcePath);
-                var linkName = string.IsNullOrEmpty(ext)
-                    ? filename
-                    : Path.ChangeExtension(filename, ext.TrimStart('.'));
-
-                var linkPath = Path.Combine(targetFolder, linkName);
-                if (TryCreateSymlink(linkPath, sourcePath))
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private bool TryCreateSymlink(string linkPath, string targetPath)
-        {
-            try
-            {
-                CreateSymlink(linkPath, targetPath);
-                return true;
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                const string Msg = "Access denied creating symlink {LinkPath} -> {TargetPath}. On Windows, Jellyfin must run as Administrator or have Developer Mode enabled.";
-                _logger.LogWarning(ex, Msg, linkPath, targetPath);
-                return false;
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning(ex, "IO error creating symlink {LinkPath} -> {TargetPath}", linkPath, targetPath);
-                return false;
-            }
         }
 
         private string GenerateFolderName(BaseItem item)
