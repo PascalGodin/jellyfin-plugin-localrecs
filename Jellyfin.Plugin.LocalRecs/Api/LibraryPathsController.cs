@@ -114,7 +114,8 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         Path = _virtualLibraryManager.LeavingSoonMoviesPath,
                         SuggestedLibraryName = "Leaving Soon — Movies",
                         LibraryCreated = LibraryExists(_virtualLibraryManager.LeavingSoonMoviesPath),
-                        IsAdminOnly = false
+                        IsAdminOnly = false,
+                        ContentType = "Movies"
                     },
                     new SharedLibraryPathInfo
                     {
@@ -122,7 +123,8 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         Path = _virtualLibraryManager.LeavingSoonTvPath,
                         SuggestedLibraryName = "Leaving Soon — TV Shows",
                         LibraryCreated = LibraryExists(_virtualLibraryManager.LeavingSoonTvPath),
-                        IsAdminOnly = false
+                        IsAdminOnly = false,
+                        ContentType = "Shows"
                     },
                     new SharedLibraryPathInfo
                     {
@@ -130,7 +132,8 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         Path = _virtualLibraryManager.RemovalCandidatesMoviesPath,
                         SuggestedLibraryName = "Removal Candidates — Movies",
                         LibraryCreated = LibraryExists(_virtualLibraryManager.RemovalCandidatesMoviesPath),
-                        IsAdminOnly = true
+                        IsAdminOnly = true,
+                        ContentType = "Movies"
                     },
                     new SharedLibraryPathInfo
                     {
@@ -138,7 +141,8 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         Path = _virtualLibraryManager.RemovalCandidatesTvPath,
                         SuggestedLibraryName = "Removal Candidates — TV Shows",
                         LibraryCreated = LibraryExists(_virtualLibraryManager.RemovalCandidatesTvPath),
-                        IsAdminOnly = true
+                        IsAdminOnly = true,
+                        ContentType = "Shows"
                     }
                 };
 

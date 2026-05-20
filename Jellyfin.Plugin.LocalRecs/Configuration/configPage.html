@@ -314,6 +314,7 @@
                         var name = self.escapeHtml(lib.Name);
                         var path = self.escapeHtml(lib.Path);
                         var suggestedName = self.escapeHtml(lib.SuggestedLibraryName);
+                        var contentType = self.escapeHtml(lib.ContentType || '');
                         var created = lib.LibraryCreated;
                         var adminOnly = lib.IsAdminOnly;
 
@@ -333,6 +334,9 @@
                         html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + path + '" style="min-width: 80px;">Copy</button>';
                         html += '</div>';
                         html += '<div class="fieldDescription" style="margin-top: 0.5em;">Suggested Library Name: <strong>' + suggestedName + '</strong></div>';
+                        if (contentType) {
+                            html += '<div class="fieldDescription" style="margin-top: 0.25em;">Content Type: <strong>' + contentType + '</strong></div>';
+                        }
                         if (adminOnly) {
                             html += '<div class="fieldDescription" style="margin-top: 0.25em; color: #ffc107;">Restrict access to administrators in library settings.</div>';
                         }
@@ -343,7 +347,14 @@
                     html += '</div>';
                     html += '<div style="background: rgba(33,150,243,0.1); padding: 1.5em; margin-top: 1em; border-left: 4px solid #2196f3;">';
                     html += '<h4 style="margin-top: 0;">Setup Instructions</h4>';
-                    html += '<p>After creating the libraries, enable the Leaving Soon feature in the <strong>Settings</strong> tab and run the recommendation refresh task.</p>';
+                    html += '<ol style="margin: 0; padding-left: 1.5em;">';
+                    html += '<li>Go to Jellyfin Dashboard → Libraries → <strong>Add Media Library</strong></li>';
+                    html += '<li>For <strong>each</strong> library above, create a separate entry:<ul style="margin-top: 0.5em;">';
+                    html += '<li>Select the <strong>Content Type</strong> shown (Movies or Shows) — this is required for correct playback</li>';
+                    html += '<li>Add the folder path shown above</li>';
+                    html += '<li>Use the suggested library name</li></ul></li>';
+                    html += '<li>Enable the Leaving Soon feature in the <strong>Settings</strong> tab and run the recommendation refresh task.</li>';
+                    html += '</ol>';
                     html += '</div>';
                     html += '</div>';
                     return html;
