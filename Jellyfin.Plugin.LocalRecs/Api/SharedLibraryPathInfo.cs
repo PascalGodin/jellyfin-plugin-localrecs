@@ -29,5 +29,10 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         /// Gets or sets a value indicating whether this library is intended for administrators only.
         /// </summary>
         public bool IsAdminOnly { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Jellyfin content type to select when creating this library (e.g. "Movies" or "Shows").
+        /// </summary>
+        public string ContentType { get; set; } = string.Empty;
     }
 }

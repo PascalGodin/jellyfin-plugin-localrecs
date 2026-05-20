@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.8.8.0",
+        "changelog": "Fix Leaving Soon library setup: require Movies/Shows content type\n- Leaving Soon and Removal Candidates setup UI now shows the required content type for each library (Movies or Shows)\n- Missing content type instruction was the root cause of playback failures from Leaving Soon libraries\n- Libraries added as Mixed Content instead of Movies/Shows are handled differently by Jellyfin and break playback\n- Setup instructions now enumerate explicit steps matching the per-user recommendation library setup",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.8.8/jellyfin-plugin-localrecs-v0.8.8.zip",
+        "checksum": "",
+        "timestamp": "2026-05-19T06:00:00Z"
+      },
+      {
         "version": "0.8.7.0",
         "changelog": "Fix movie playback in virtual libraries\n- Replace per-movie file symlinks with directory symlinks to the source movie folder\n- File symlinks were resolved by Jellyfin's scanner to the source file path, causing virtual items to be deduplicated with source library items and played back via the source item path, breaking playback from the virtual library\n- Directory symlinks keep the virtual path intact; the OS resolves them at stream time, matching the approach already used for TV series since v0.8.5\n- Removes artwork/trailer symlinking code (source folder content is accessible directly via the directory symlink)",
         "targetAbi": "10.11.0.0",
