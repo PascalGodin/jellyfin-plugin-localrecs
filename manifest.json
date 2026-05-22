@@ -12,7 +12,7 @@
         "changelog": "List no-metadata and not-found items in diagnostic log\n- Exclusion summary now shows not-found count alongside no-metadata\n- Items excluded for no-metadata or not-found are listed by name under each exclusion line\n- Lists are per media type (movies / TV) and only shown when non-empty",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.5/jellyfin-plugin-localrecs-v0.6.0.5.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "5535ea7c5c5934d9aed1c753cf28f89d",
         "timestamp": "2026-05-22T00:00:00Z"
       },
       {
