@@ -448,16 +448,9 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
             var count = 0;
 
-            // For movies item.Path is the file; for series it's the folder itself.
-            string? sourceDir = null;
-            if (!string.IsNullOrEmpty(item.Path))
-            {
-                sourceDir = Directory.Exists(item.Path) ? item.Path : Path.GetDirectoryName(item.Path);
-            }
-
             foreach (var (imageType, filename) in mappings)
             {
-                string? sourcePath = null;
+                string? sourcePath;
                 try
                 {
                     sourcePath = item.GetImagePath(imageType, 0);
@@ -465,18 +458,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 catch (Exception ex)
                 {
                     _logger.LogDebug(ex, "Failed to resolve {ImageType} for {ItemName}", imageType, item.Name);
-                }
-
-                // Fallback: look for conventional artwork filenames adjacent to the media file
-                if ((string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
-                    && !string.IsNullOrEmpty(sourceDir)
-                    && Directory.Exists(sourceDir))
-                {
-                    var candidatePath = Path.Combine(sourceDir, filename);
-                    if (File.Exists(candidatePath))
-                    {
-                        sourcePath = candidatePath;
-                    }
+                    continue;
                 }
 
                 if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))

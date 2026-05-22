@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.2",
+        "changelog": "Fix failing unit test in SyncRecommendations_SymlinksArtworkFromSourceFolder\n- Test now correctly registers artwork paths via ImageInfos instead of relying on filesystem scanning\n- No change to production code",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.2/jellyfin-plugin-localrecs-v0.6.0.2.zip",
+        "checksum": "",
+        "timestamp": "2026-05-22T00:00:00Z"
+      },
+      {
         "version": "0.6.0.1",
         "changelog": "Add recommendation diagnostic log\n- After each refresh task, writes recommendation_log.txt to the plugin data folder\n- Log contains: library size, vocabulary breakdown, embedding dimensions, and ranked recommendations per user with scores\n- Viewable in the plugin Actions tab (Refresh Log / Download Log buttons)\n- Warm-start users show cosine similarity scores; cold-start users show rating-based scores",
         "targetAbi": "10.11.0.0",
