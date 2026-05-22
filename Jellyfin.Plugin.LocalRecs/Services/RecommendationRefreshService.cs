@@ -61,26 +61,33 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// Computes fresh embeddings for the library.
         /// Always recomputes to ensure recommendations reflect current watch history.
         /// </summary>
-        /// <returns>Tuple of embeddings, metadata, and vocabulary.</returns>
-        public (IReadOnlyDictionary<Guid, ItemEmbedding> Embeddings, IReadOnlyDictionary<Guid, MediaItemMetadata> Metadata, FeatureVocabulary Vocabulary) ComputeEmbeddings()
+        /// <returns>Tuple of embeddings, metadata, vocabulary, and per-phase durations.</returns>
+        public (IReadOnlyDictionary<Guid, ItemEmbedding> Embeddings, IReadOnlyDictionary<Guid, MediaItemMetadata> Metadata, FeatureVocabulary Vocabulary, TimeSpan LibraryScan, TimeSpan VocabularyBuild, TimeSpan EmbeddingCompute) ComputeEmbeddings()
         {
+            var t0 = DateTime.UtcNow;
             var library = _libraryAnalysisService.GetAllMediaItems();
             var metadata = library.ToDictionary(m => m.Id);
+            var libraryScan = DateTime.UtcNow - t0;
 
             _logger.LogDebug("Computing fresh embeddings for {Count} items", library.Count);
 
             var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
 
+            var t1 = DateTime.UtcNow;
             var vocabulary = _vocabularyBuilder.BuildVocabulary(
                 library,
                 config.MaxVocabularyActors,
                 config.MaxVocabularyDirectors,
                 config.MaxVocabularyTags);
+            var vocabularyBuild = DateTime.UtcNow - t1;
+
+            var t2 = DateTime.UtcNow;
             var embeddings = _embeddingService.ComputeEmbeddings(library, vocabulary);
+            var embeddingCompute = DateTime.UtcNow - t2;
 
             var embeddingsDict = embeddings.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-            return (embeddingsDict, metadata, vocabulary);
+            return (embeddingsDict, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute);
         }
 
         /// <summary>
@@ -90,8 +97,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="embeddings">Pre-computed item embeddings.</param>
         /// <param name="metadata">Item metadata dictionary.</param>
         /// <param name="config">Plugin configuration.</param>
-        /// <returns>Movie and TV recommendations, warm-start flag, and watched item count.</returns>
-        public (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv, bool WarmStart, int WatchedItemCount) GenerateRecommendationsForUser(
+        /// <returns>Movie and TV recommendations, warm-start flag, watched item count, user profile, and exclusion counts.</returns>
+        public (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv, bool WarmStart, int WatchedItemCount, UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions) GenerateRecommendationsForUser(
             Guid userId,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
@@ -113,6 +120,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     config,
                     MediaType.Movie,
                     config.MovieRecommendationCount);
+                var movieExclusions = _recommendationEngine.LastExclusionCounts;
 
                 var tvRecs = _recommendationEngine.GenerateRecommendations(
                     userId,
@@ -122,6 +130,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     config,
                     MediaType.Series,
                     config.TvRecommendationCount);
+                var tvExclusions = _recommendationEngine.LastExclusionCounts;
 
                 _logger.LogDebug(
                     "Generated recommendations for user {UserId}: {MovieCount} movies, {TvCount} TV",
@@ -129,12 +138,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     movieRecs.Count,
                     tvRecs.Count);
 
-                return (movieRecs, tvRecs, warmStart, watchedCount);
+                return (movieRecs, tvRecs, warmStart, watchedCount, profile, movieExclusions, tvExclusions);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to generate recommendations for user {UserId}", userId);
-                return (new List<ScoredRecommendation>(), new List<ScoredRecommendation>(), false, 0);
+                return (new List<ScoredRecommendation>(), new List<ScoredRecommendation>(), false, 0, null, new ExclusionCounts(), new ExclusionCounts());
             }
         }
 
@@ -160,24 +169,30 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             _logger.LogInformation("Generating recommendations for {Count} users", userIds.Count);
 
-            var (embeddings, metadata, vocabulary) = ComputeEmbeddings();
+            var (embeddings, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute) = ComputeEmbeddings();
 
             // Per-user data collected for the diagnostic log
             var userLogEntries = new List<(string Username, bool WarmStart, int WatchedCount,
-                List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)>();
+                List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv,
+                UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions,
+                TimeSpan UserDuration)>();
 
             foreach (var userId in userIds)
             {
-                var (movies, tv, warmStart, watchedCount) = GenerateRecommendationsForUser(userId, embeddings, metadata, config);
+                var userStart = DateTime.UtcNow;
+                var (movies, tv, warmStart, watchedCount, profile, movieExclusions, tvExclusions) =
+                    GenerateRecommendationsForUser(userId, embeddings, metadata, config);
+                var userDuration = DateTime.UtcNow - userStart;
+
                 results[userId] = (movies, tv);
 
                 var username = _userManager.GetUserById(userId)?.Username ?? userId.ToString();
-                userLogEntries.Add((username, warmStart, watchedCount, movies, tv));
+                userLogEntries.Add((username, warmStart, watchedCount, movies, tv, profile, movieExclusions, tvExclusions, userDuration));
             }
 
             _logger.LogInformation("Successfully generated recommendations for {Count}/{Total} users", results.Count, userIds.Count);
 
-            WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, config);
+            WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, config, libraryScan, vocabularyBuild, embeddingCompute);
 
             return Task.FromResult(results);
         }
@@ -204,18 +219,59 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine();
         }
 
+        private static List<(string Label, float Weight)> GetTopTasteFeatures(
+            float[] tasteVector,
+            FeatureVocabulary vocabulary,
+            int topN = 10)
+        {
+            var features = new List<(string Label, float Weight)>();
+            var offset = 0;
+
+            void AddSection(string type, IReadOnlyDictionary<string, float> idf)
+            {
+                foreach (var (name, _) in idf)
+                {
+                    if (offset < tasteVector.Length)
+                    {
+                        features.Add(($"{type}: {name}", tasteVector[offset]));
+                    }
+
+                    offset++;
+                }
+            }
+
+            AddSection("Genre", vocabulary.GenreIdf);
+            AddSection("Actor", vocabulary.ActorIdf);
+            AddSection("Director", vocabulary.DirectorIdf);
+            AddSection("Tag", vocabulary.TagIdf);
+            AddSection("Decade", vocabulary.DecadeIdf);
+
+            return features
+                .Where(f => f.Weight > 0f)
+                .OrderByDescending(f => f.Weight)
+                .Take(topN)
+                .ToList();
+        }
+
         private void WriteDiagnosticLog(
             DateTime startTime,
             IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
             FeatureVocabulary vocabulary,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
-            List<(string Username, bool WarmStart, int WatchedCount, List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)> userEntries,
-            PluginConfiguration config)
+            List<(string Username, bool WarmStart, int WatchedCount,
+                List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv,
+                UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions,
+                TimeSpan UserDuration)> userEntries,
+            PluginConfiguration config,
+            TimeSpan libraryScan,
+            TimeSpan vocabularyBuild,
+            TimeSpan embeddingCompute)
         {
-            var duration = DateTime.UtcNow - startTime;
+            var totalDuration = DateTime.UtcNow - startTime;
             var movieCount = metadata.Values.Count(m => m.Type == MediaType.Movie);
             var seriesCount = metadata.Values.Count(m => m.Type == MediaType.Series);
             var embeddingDim = embeddings.Values.FirstOrDefault()?.Vector.Length ?? 0;
+            var perUserTotal = userEntries.Aggregate(TimeSpan.Zero, (acc, e) => acc + e.UserDuration);
 
             var sb = new StringBuilder();
             var line = new string('=', 80);
@@ -224,16 +280,38 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine(line);
             sb.AppendLine("LocalRecs Diagnostic Log");
             sb.AppendLine($"Run timestamp : {startTime:yyyy-MM-dd HH:mm:ss} UTC");
-            sb.AppendLine($"Duration      : {duration.TotalSeconds:F2} s");
+            sb.AppendLine($"Duration      : {totalDuration.TotalSeconds:F2} s");
             sb.AppendLine(line);
             sb.AppendLine();
 
+            // CONFIG
+            sb.AppendLine("CONFIG");
+            sb.AppendLine($"  Movies             : {config.MovieRecommendationCount}");
+            sb.AppendLine($"  TV shows           : {config.TvRecommendationCount}");
+            sb.AppendLine($"  Min watched        : {config.MinWatchedItemsForPersonalization}");
+            sb.AppendLine($"  Favorite boost     : {config.FavoriteBoost:F1}×");
+            sb.AppendLine($"  Rewatch boost      : {config.RewatchBoost:F1}×");
+            sb.AppendLine($"  Recency half-life  : {config.RecencyDecayHalfLifeDays:F0} d");
+            var proximityLabel = config.EnableRatingProximity
+                ? $"on ({config.RatingProximityWeight:P0} blend)"
+                : "off";
+            sb.AppendLine($"  Rating proximity   : {proximityLabel}");
+            var actorsLabel = config.MaxVocabularyActors > 0 ? $"{config.MaxVocabularyActors} (limited)" : "unlimited";
+            var directorsLabel = config.MaxVocabularyDirectors > 0 ? $"{config.MaxVocabularyDirectors} (limited)" : "unlimited";
+            var tagsLabel = config.MaxVocabularyTags > 0 ? $"{config.MaxVocabularyTags} (limited)" : "unlimited";
+            sb.AppendLine($"  Vocab actors       : {actorsLabel}");
+            sb.AppendLine($"  Vocab directors    : {directorsLabel}");
+            sb.AppendLine($"  Vocab tags         : {tagsLabel}");
+            sb.AppendLine();
+
+            // LIBRARY
             sb.AppendLine("LIBRARY");
             sb.AppendLine($"  Movies  : {movieCount}");
             sb.AppendLine($"  Series  : {seriesCount}");
             sb.AppendLine($"  Total   : {metadata.Count}");
             sb.AppendLine();
 
+            // VOCABULARY
             sb.AppendLine("VOCABULARY");
             sb.AppendLine($"  Genres     : {vocabulary.Genres.Count,4}");
             sb.AppendLine($"  Actors     : {vocabulary.Actors.Count,4}");
@@ -244,15 +322,44 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"  Dimensions : {embeddingDim,4}");
             sb.AppendLine();
 
-            foreach (var (username, warmStart, watchedCount, movies, tv) in userEntries)
+            // TIMING
+            sb.AppendLine("TIMING");
+            sb.AppendLine($"  Library scan  : {libraryScan.TotalSeconds,6:F2} s");
+            sb.AppendLine($"  Vocabulary    : {vocabularyBuild.TotalSeconds,6:F2} s");
+            sb.AppendLine($"  Embeddings    : {embeddingCompute.TotalSeconds,6:F2} s");
+            sb.AppendLine($"  Per user      : {perUserTotal.TotalSeconds,6:F2} s");
+            sb.AppendLine($"  Total         : {totalDuration.TotalSeconds,6:F2} s");
+            sb.AppendLine();
+
+            foreach (var (username, warmStart, watchedCount, movies, tv, profile, movieExclusions, tvExclusions, userDuration) in userEntries)
             {
                 sb.AppendLine(dash);
-                sb.AppendLine($"USER: {username}");
+                sb.AppendLine($"USER: {username}  ({userDuration.TotalSeconds:F2} s)");
 
                 var profileLabel = warmStart
                     ? $"warm-start ({watchedCount} watched items)"
                     : $"cold-start ({watchedCount} watched items, threshold: {config.MinWatchedItemsForPersonalization})";
                 sb.AppendLine($"  Profile : {profileLabel}");
+
+                if (warmStart)
+                {
+                    sb.AppendLine($"  Exclusions (movies): {movieExclusions.Watched} watched, {movieExclusions.InProgress} in-progress, {movieExclusions.Inaccessible} inaccessible, {movieExclusions.NoMetadata} no-metadata → {movieExclusions.Final} candidates");
+                    sb.AppendLine($"  Exclusions (TV)    : {tvExclusions.SeriesWatched} watched, {tvExclusions.InProgress} in-progress, {tvExclusions.Inaccessible} inaccessible, {tvExclusions.NoMetadata} no-metadata → {tvExclusions.Final} candidates");
+
+                    if (profile != null)
+                    {
+                        var topFeatures = GetTopTasteFeatures(profile.TasteVector, vocabulary);
+                        if (topFeatures.Count > 0)
+                        {
+                            sb.AppendLine($"  Top taste signals:");
+                            for (var i = 0; i < topFeatures.Count; i++)
+                            {
+                                sb.AppendLine($"    {i + 1,3}.  {topFeatures[i].Weight:F3}  {topFeatures[i].Label}");
+                            }
+                        }
+                    }
+                }
+
                 sb.AppendLine();
 
                 AppendRecommendationList(sb, "Movies", movies, metadata, warmStart);

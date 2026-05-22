@@ -24,6 +24,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         private readonly IUserManager _userManager;
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<RecommendationEngine> _logger;
+        private ExclusionCounts _lastExclusionCounts = new ExclusionCounts();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationEngine"/> class.
@@ -43,6 +44,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
+
+        /// <summary>Gets the exclusion counts from the most recent <see cref="GenerateRecommendations"/> call.</summary>
+        public ExclusionCounts LastExclusionCounts => _lastExclusionCounts;
 
         /// <summary>
         /// Generates recommendations for a user.
@@ -96,6 +100,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 userId,
                 mediaType?.ToString() ?? "All",
                 maxResults);
+
+            _lastExclusionCounts = new ExclusionCounts();
 
             // Check for cold-start scenario
             if (userProfile == null || userProfile.WatchedItemCount < config.MinWatchedItemsForPersonalization)
@@ -213,6 +219,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 accessibleItemIds.Count);
 
             var candidates = new List<Guid>();
+            int excInaccessible = 0, excNoMetadata = 0, excNotFound = 0,
+                excWatched = 0, excSeriesWatched = 0, excInProgress = 0;
 
             foreach (var itemId in availableItemIds)
             {
@@ -231,6 +239,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 // Exclude items from libraries the user cannot access
                 if (!accessibleItemIds.Contains(itemId))
                 {
+                    excInaccessible++;
                     continue;
                 }
 
@@ -238,6 +247,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 // These produce unreliable similarity scores
                 if (itemMetadata.Genres.Count == 0 && itemMetadata.Actors.Count == 0)
                 {
+                    excNoMetadata++;
                     continue;
                 }
 
@@ -248,6 +258,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         "Item not found in library: {ItemId} ({Name})",
                         itemId,
                         itemMetadata.Name);
+                    excNotFound++;
                     continue;
                 }
 
@@ -273,6 +284,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         _logger.LogDebug(
                             "Excluding series with watch history: {Name}",
                             itemMetadata.Name);
+                        excSeriesWatched++;
                         continue;
                     }
                 }
@@ -282,6 +294,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         "Excluding watched item: {Name} (Played={Played})",
                         itemMetadata.Name,
                         userData.Played);
+                    excWatched++;
                     continue;
                 }
 
@@ -290,11 +303,23 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 // and should not be re-added to recommendations until fully unwatched
                 if (userData != null && userData.PlaybackPositionTicks > 0)
                 {
+                    excInProgress++;
                     continue;
                 }
 
                 candidates.Add(itemId);
             }
+
+            _lastExclusionCounts = new ExclusionCounts
+            {
+                Inaccessible = excInaccessible,
+                NoMetadata = excNoMetadata,
+                NotFound = excNotFound,
+                Watched = excWatched,
+                SeriesWatched = excSeriesWatched,
+                InProgress = excInProgress,
+                Final = candidates.Count
+            };
 
             return candidates;
         }
