@@ -12,7 +12,7 @@
         "changelog": "Fix compatibility with Jellyfin 10.11.9\n- Replace IUserManager.Users (removed in 10.11.9) with GetUsers() in RecommendationRefreshTask and BenchmarkTask\n- Update SDK references to Jellyfin 10.11.9",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.3/jellyfin-plugin-localrecs-v0.6.0.3.zip",
-        "checksum": "",
+        "checksum": "d22159e30f7c5264a31af92900a167ac",
         "timestamp": "2026-05-22T00:00:00Z"
       },
       {
