@@ -24,6 +24,7 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             MaxVocabularyTags = 500;
             EnableRatingProximity = true;
             RatingProximityWeight = 0.2;
+            EnableDiagnosticLog = false;
         }
 
         /// <summary>
@@ -83,6 +84,13 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         /// Default: 0.2 (20% rating proximity, 80% content similarity).
         /// </summary>
         public double RatingProximityWeight { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to write a diagnostic log after each recommendation refresh.
+        /// The log includes per-item score breakdowns, exclusion details, and taste signals.
+        /// Default: false.
+        /// </summary>
+        public bool EnableDiagnosticLog { get; set; }
 
         /// <summary>
         /// Validates the configuration and returns validation errors.

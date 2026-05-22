@@ -192,7 +192,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             _logger.LogInformation("Successfully generated recommendations for {Count}/{Total} users", results.Count, userIds.Count);
 
-            WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, config, libraryScan, vocabularyBuild, embeddingCompute);
+            if (config.EnableDiagnosticLog)
+            {
+                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, config, libraryScan, vocabularyBuild, embeddingCompute);
+            }
 
             return Task.FromResult(results);
         }
@@ -216,7 +219,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             string label,
             List<ScoredRecommendation> recs,
             IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
-            bool warmStart)
+            bool warmStart,
+            UserProfile? profile = null)
         {
             var suffix = warmStart ? string.Empty : ", by rating";
             sb.AppendLine($"  {label} ({recs.Count}{suffix}):");
@@ -228,6 +232,47 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 var name = meta?.Name ?? rec.ItemId.ToString();
                 var year = meta?.ReleaseYear > 0 ? $" ({meta.ReleaseYear})" : string.Empty;
                 sb.AppendLine($"    {i + 1,3}.  {rec.Score:F3}  {name}{year}");
+
+                if (rec.CosineSimilarity.HasValue)
+                {
+                    var detail = $"           cosine={rec.CosineSimilarity.Value:F3}";
+
+                    if (rec.RatingProximity.HasValue)
+                    {
+                        detail += $"  rating-prox={rec.RatingProximity.Value:F3}";
+
+                        var parts = new System.Collections.Generic.List<string>();
+
+                        if (rec.ItemCommunityRating.HasValue)
+                        {
+                            var s = $"community: item={rec.ItemCommunityRating.Value:F1}";
+                            if (profile?.AverageCommunityRating.HasValue == true)
+                            {
+                                s += $" user={profile.AverageCommunityRating.Value:F1}";
+                            }
+
+                            parts.Add(s);
+                        }
+
+                        if (rec.ItemCriticRating.HasValue)
+                        {
+                            var s = $"critic: item={rec.ItemCriticRating.Value:F0}";
+                            if (profile?.AverageCriticRating.HasValue == true)
+                            {
+                                s += $" user={profile.AverageCriticRating.Value:F0}";
+                            }
+
+                            parts.Add(s);
+                        }
+
+                        if (parts.Count > 0)
+                        {
+                            detail += $"  [{string.Join(" | ", parts)}]";
+                        }
+                    }
+
+                    sb.AppendLine(detail);
+                }
             }
 
             sb.AppendLine();
@@ -355,6 +400,17 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     : $"cold-start ({watchedCount} watched items, threshold: {config.MinWatchedItemsForPersonalization})";
                 sb.AppendLine($"  Profile : {profileLabel}");
 
+                if (warmStart && profile != null)
+                {
+                    var communityStr = profile.AverageCommunityRating.HasValue
+                        ? $"community avg={profile.AverageCommunityRating.Value:F1} (±{profile.CommunityRatingStdDev:F1})"
+                        : "community avg=n/a";
+                    var criticStr = profile.AverageCriticRating.HasValue
+                        ? $"critic avg={profile.AverageCriticRating.Value:F0} (±{profile.CriticRatingStdDev:F0})"
+                        : "critic avg=n/a";
+                    sb.AppendLine($"  Ratings : {communityStr}  {criticStr}");
+                }
+
                 if (warmStart)
                 {
                     sb.AppendLine($"  Exclusions (movies): {movieExclusions.Watched} watched, {movieExclusions.InProgress} in-progress, {movieExclusions.Inaccessible} inaccessible, {movieExclusions.NoMetadata} no-metadata, {movieExclusions.NotFound} not-found → {movieExclusions.Final} candidates");
@@ -380,8 +436,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 sb.AppendLine();
 
-                AppendRecommendationList(sb, "Movies", movies, metadata, warmStart);
-                AppendRecommendationList(sb, "TV Shows", tv, metadata, warmStart);
+                AppendRecommendationList(sb, "Movies", movies, metadata, warmStart, profile);
+                AppendRecommendationList(sb, "TV Shows", tv, metadata, warmStart, profile);
             }
 
             sb.AppendLine(line);

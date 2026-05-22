@@ -89,6 +89,14 @@
                             <div class="fieldDescription">How much to blend rating similarity (0.0 = pure content match, 1.0 = pure rating match, default: 0.2)</div>
                         </div>
                         
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="enableDiagnosticLog" name="enableDiagnosticLog" />
+                                <span>Enable Diagnostic Log</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Write a detailed log after each refresh with per-item score breakdowns, exclusion details, and taste signals. Viewable in the Actions tab.</div>
+                        </div>
+
                         <h2 class="sectionTitle">Performance Tuning</h2>
                         
                         <div class="inputContainer">
@@ -452,6 +460,7 @@
                             page.querySelector('#maxVocabularyTags').value = config.MaxVocabularyTags || 500;
                             page.querySelector('#enableRatingProximity').checked = config.EnableRatingProximity || false;
                             page.querySelector('#ratingProximityWeight').value = config.RatingProximityWeight || 0.2;
+                            page.querySelector('#enableDiagnosticLog').checked = config.EnableDiagnosticLog || false;
 
                             self.updateFieldVisibility(page);
                             Dashboard.hideLoadingMsg();
@@ -491,6 +500,7 @@
                             config.MaxVocabularyTags = parseInt(page.querySelector('#maxVocabularyTags').value);
                             config.EnableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                             config.RatingProximityWeight = parseFloat(page.querySelector('#ratingProximityWeight').value);
+                            config.EnableDiagnosticLog = page.querySelector('#enableDiagnosticLog').checked;
 
                             return ApiClient.updatePluginConfiguration(self.pluginId, config);
                         })

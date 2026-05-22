@@ -376,7 +376,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             // If rating proximity is disabled, return pure cosine similarity
             if (!config.EnableRatingProximity)
             {
-                return new ScoredRecommendation(candidateEmbedding.ItemId, cosineSimilarity);
+                return new ScoredRecommendation(candidateEmbedding.ItemId, cosineSimilarity)
+                {
+                    CosineSimilarity = cosineSimilarity,
+                    ItemCommunityRating = itemMetadata.CommunityRating,
+                    ItemCriticRating = itemMetadata.CriticRating
+                };
             }
 
             // Compute rating proximity components
@@ -408,7 +413,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var finalScore = ((1 - config.RatingProximityWeight) * cosineSimilarity)
                            + (config.RatingProximityWeight * ratingProximity);
 
-            return new ScoredRecommendation(candidateEmbedding.ItemId, (float)finalScore);
+            return new ScoredRecommendation(candidateEmbedding.ItemId, (float)finalScore)
+            {
+                CosineSimilarity = cosineSimilarity,
+                CommunityProximity = (float)communityProximity,
+                CriticProximity = (float)criticProximity,
+                RatingProximity = (float)ratingProximity,
+                ItemCommunityRating = itemMetadata.CommunityRating,
+                ItemCriticRating = itemMetadata.CriticRating
+            };
         }
 
         /// <summary>
