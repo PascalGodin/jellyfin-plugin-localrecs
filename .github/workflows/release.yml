@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          # 4-part versions (e.g. 0.6.0.1) are used as-is; 3-part versions get .0 appended
+          DOTS=$(echo "$TAG" | tr -cd '.' | wc -c)
+          if [ "$DOTS" -eq 3 ]; then
+            MANIFEST_VERSION="${TAG}"
+          else
+            MANIFEST_VERSION="${TAG}.0"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "manifest_version=${MANIFEST_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=jellyfin-plugin-localrecs-v${TAG}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        run: |
+          cd Jellyfin.Plugin.LocalRecs/bin/Release/net9.0
+          zip "${{ github.workspace }}/${{ steps.version.outputs.zip_name }}" Jellyfin.Plugin.LocalRecs.dll
+
+      - name: Compute MD5 checksum
+        id: checksum
+        run: |
+          CHECKSUM=$(md5sum "${{ steps.version.outputs.zip_name }}" | awk '{print $1}')
+          echo "value=${CHECKSUM}" >> "$GITHUB_OUTPUT"
+          echo "Checksum: ${CHECKSUM}"
+
+      - name: Update manifest.json
+        run: |
+          python3 - <<'EOF'
+          import json, os
+
+          version = os.environ['MANIFEST_VERSION']
+          checksum = os.environ['CHECKSUM']
+
+          with open('manifest.json') as f:
+              manifest = json.load(f)
+
+          updated = False
+          for v in manifest[0]['versions']:
+              if v['version'] == version:
+                  v['checksum'] = checksum
+                  updated = True
+                  break
+
+          if not updated:
+              raise RuntimeError(f"Version {version} not found in manifest.json")
+
+          with open('manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+              f.write('\n')
+
+          print(f"Updated checksum for {version}: {checksum}")
+          EOF
+        env:
+          MANIFEST_VERSION: ${{ steps.version.outputs.manifest_version }}
+          CHECKSUM: ${{ steps.checksum.outputs.value }}
+
+      - name: Commit updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Update manifest checksum for v${{ steps.version.outputs.tag }}"
+          git push origin HEAD:feature/diagnostic-log
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.version.outputs.zip_name }}
+          generate_release_notes: false
+          body: |
+            Plugin zip: `${{ steps.version.outputs.zip_name }}`
+            MD5: `${{ steps.checksum.outputs.value }}`

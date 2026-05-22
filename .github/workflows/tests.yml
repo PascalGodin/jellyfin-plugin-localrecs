@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - feature/diagnostic-log
   pull_request:
     branches:
       - main
+      - feature/diagnostic-log
 
 jobs:
   build-and-test:
