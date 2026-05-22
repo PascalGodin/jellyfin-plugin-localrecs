@@ -86,6 +86,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <summary>
         /// Generates recommendations for a single user.
         /// </summary>
+        /// <param name="userId">The user ID.</param>
+        /// <param name="embeddings">Pre-computed item embeddings.</param>
+        /// <param name="metadata">Item metadata dictionary.</param>
+        /// <param name="config">Plugin configuration.</param>
+        /// <returns>Movie and TV recommendations, warm-start flag, and watched item count.</returns>
         public (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv, bool WarmStart, int WatchedItemCount) GenerateRecommendationsForUser(
             Guid userId,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
@@ -177,6 +182,28 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             return Task.FromResult(results);
         }
 
+        private static void AppendRecommendationList(
+            StringBuilder sb,
+            string label,
+            List<ScoredRecommendation> recs,
+            IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
+            bool warmStart)
+        {
+            var suffix = warmStart ? string.Empty : ", by rating";
+            sb.AppendLine($"  {label} ({recs.Count}{suffix}):");
+
+            for (var i = 0; i < recs.Count; i++)
+            {
+                var rec = recs[i];
+                metadata.TryGetValue(rec.ItemId, out var meta);
+                var name = meta?.Name ?? rec.ItemId.ToString();
+                var year = meta?.ReleaseYear > 0 ? $" ({meta.ReleaseYear})" : string.Empty;
+                sb.AppendLine($"    {i + 1,3}.  {rec.Score:F3}  {name}{year}");
+            }
+
+            sb.AppendLine();
+        }
+
         private void WriteDiagnosticLog(
             DateTime startTime,
             IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
@@ -235,28 +262,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine(line);
 
             _diagnosticLogService.Save(sb.ToString());
-        }
-
-        private static void AppendRecommendationList(
-            StringBuilder sb,
-            string label,
-            List<ScoredRecommendation> recs,
-            IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
-            bool warmStart)
-        {
-            var suffix = warmStart ? string.Empty : ", by rating";
-            sb.AppendLine($"  {label} ({recs.Count}{suffix}):");
-
-            for (var i = 0; i < recs.Count; i++)
-            {
-                var rec = recs[i];
-                metadata.TryGetValue(rec.ItemId, out var meta);
-                var name = meta?.Name ?? rec.ItemId.ToString();
-                var year = meta?.ReleaseYear > 0 ? $" ({meta.ReleaseYear})" : string.Empty;
-                sb.AppendLine($"    {i + 1,3}.  {rec.Score:F3}  {name}{year}");
-            }
-
-            sb.AppendLine();
         }
     }
 }

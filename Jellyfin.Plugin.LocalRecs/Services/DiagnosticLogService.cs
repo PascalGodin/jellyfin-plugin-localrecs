@@ -20,14 +20,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        private string GetLogFilePath()
-        {
-            var dataPath = Plugin.Instance?.DataFolderPath
-                ?? throw new InvalidOperationException("Plugin instance is not yet available");
-            return Path.Combine(dataPath, "recommendation_log.txt");
-        }
-
-        /// <summary>Saves <paramref name="content"/> to the log file, overwriting any previous run.</summary>
+        /// <summary>Saves the log content to disk, overwriting any previous run.</summary>
+        /// <param name="content">The text to write.</param>
         public void Save(string content)
         {
             try
@@ -42,7 +36,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
         }
 
-        /// <summary>Loads the log file. Returns null if no run has been recorded yet.</summary>
+        /// <summary>Loads the log file.</summary>
+        /// <returns>Log content and last-write timestamp, or null if no run has been recorded yet.</returns>
         public (string Content, DateTime LastModified)? Load()
         {
             try
@@ -60,6 +55,13 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 _logger.LogError(ex, "Failed to load diagnostic log");
                 return null;
             }
+        }
+
+        private string GetLogFilePath()
+        {
+            var dataPath = Plugin.Instance?.DataFolderPath
+                ?? throw new InvalidOperationException("Plugin instance is not yet available");
+            return Path.Combine(dataPath, "recommendation_log.txt");
         }
     }
 }
