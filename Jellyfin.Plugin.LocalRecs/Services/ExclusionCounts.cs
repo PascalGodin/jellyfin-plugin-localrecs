@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Jellyfin.Plugin.LocalRecs.Services
 {
     /// <summary>Records why candidates were excluded during recommendation filtering for a single media type.</summary>
@@ -23,6 +26,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>Gets the number of items that passed all filters.</summary>
         public int Final { get; init; }
+
+        /// <summary>Gets the names of items excluded due to missing genres and actors.</summary>
+        public IReadOnlyList<string> NoMetadataItems { get; init; } = Array.Empty<string>();
+
+        /// <summary>Gets the names of items not found in the Jellyfin library.</summary>
+        public IReadOnlyList<string> NotFoundItems { get; init; } = Array.Empty<string>();
 
         /// <summary>Gets the total number of excluded items.</summary>
         public int TotalExcluded => Inaccessible + NoMetadata + NotFound + Watched + SeriesWatched + InProgress;

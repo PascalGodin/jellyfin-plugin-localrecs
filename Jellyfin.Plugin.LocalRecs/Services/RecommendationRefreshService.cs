@@ -197,6 +197,20 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             return Task.FromResult(results);
         }
 
+        private static void AppendExclusionItems(StringBuilder sb, string label, IReadOnlyList<string> items)
+        {
+            if (items.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine($"    {label}:");
+            foreach (var name in items)
+            {
+                sb.AppendLine($"      - {name}");
+            }
+        }
+
         private static void AppendRecommendationList(
             StringBuilder sb,
             string label,
@@ -343,8 +357,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 if (warmStart)
                 {
-                    sb.AppendLine($"  Exclusions (movies): {movieExclusions.Watched} watched, {movieExclusions.InProgress} in-progress, {movieExclusions.Inaccessible} inaccessible, {movieExclusions.NoMetadata} no-metadata → {movieExclusions.Final} candidates");
-                    sb.AppendLine($"  Exclusions (TV)    : {tvExclusions.SeriesWatched} watched, {tvExclusions.InProgress} in-progress, {tvExclusions.Inaccessible} inaccessible, {tvExclusions.NoMetadata} no-metadata → {tvExclusions.Final} candidates");
+                    sb.AppendLine($"  Exclusions (movies): {movieExclusions.Watched} watched, {movieExclusions.InProgress} in-progress, {movieExclusions.Inaccessible} inaccessible, {movieExclusions.NoMetadata} no-metadata, {movieExclusions.NotFound} not-found → {movieExclusions.Final} candidates");
+                    AppendExclusionItems(sb, "no-metadata", movieExclusions.NoMetadataItems);
+                    AppendExclusionItems(sb, "not-found", movieExclusions.NotFoundItems);
+                    sb.AppendLine($"  Exclusions (TV)    : {tvExclusions.SeriesWatched} watched, {tvExclusions.InProgress} in-progress, {tvExclusions.Inaccessible} inaccessible, {tvExclusions.NoMetadata} no-metadata, {tvExclusions.NotFound} not-found → {tvExclusions.Final} candidates");
+                    AppendExclusionItems(sb, "no-metadata", tvExclusions.NoMetadataItems);
+                    AppendExclusionItems(sb, "not-found", tvExclusions.NotFoundItems);
 
                     if (profile != null)
                     {

@@ -221,6 +221,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var candidates = new List<Guid>();
             int excInaccessible = 0, excNoMetadata = 0, excNotFound = 0,
                 excWatched = 0, excSeriesWatched = 0, excInProgress = 0;
+            var noMetadataItems = new List<string>();
+            var notFoundItems = new List<string>();
 
             foreach (var itemId in availableItemIds)
             {
@@ -247,6 +249,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 // These produce unreliable similarity scores
                 if (itemMetadata.Genres.Count == 0 && itemMetadata.Actors.Count == 0)
                 {
+                    noMetadataItems.Add(itemMetadata.Name);
                     excNoMetadata++;
                     continue;
                 }
@@ -258,6 +261,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         "Item not found in library: {ItemId} ({Name})",
                         itemId,
                         itemMetadata.Name);
+                    notFoundItems.Add(itemMetadata.Name);
                     excNotFound++;
                     continue;
                 }
@@ -314,7 +318,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             {
                 Inaccessible = excInaccessible,
                 NoMetadata = excNoMetadata,
+                NoMetadataItems = noMetadataItems,
                 NotFound = excNotFound,
+                NotFoundItems = notFoundItems,
                 Watched = excWatched,
                 SeriesWatched = excSeriesWatched,
                 InProgress = excInProgress,
