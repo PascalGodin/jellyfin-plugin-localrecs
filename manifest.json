@@ -12,7 +12,7 @@
         "changelog": "Expand diagnostic log with config snapshot, timing breakdown, exclusion summary, and top taste signals\n- CONFIG section: shows all active settings for the run\n- TIMING section: per-phase durations (library scan, vocabulary, embeddings, per-user)\n- Exclusion summary per user: watched, in-progress, inaccessible, no-metadata counts and final candidate count\n- Top taste signals: top-weighted vocabulary features driving each user's taste profile",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.4/jellyfin-plugin-localrecs-v0.6.0.4.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "2c6eeff04e7e16ec3826d86c5e63551a",
         "timestamp": "2026-05-22T00:00:00Z"
       },
       {
