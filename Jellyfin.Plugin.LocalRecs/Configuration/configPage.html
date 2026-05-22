@@ -145,9 +145,24 @@
                             <!-- Benchmark results will be loaded here -->
                         </div>
                         
+                        <h3 class="sectionTitle">Recommendation Diagnostic Log</h3>
+                        <p>After each recommendation run a log is saved showing the library size, vocabulary, embedding dimension, and ranked recommendations per user.</p>
+
+                        <button is="emby-button" type="button" class="raised" id="refreshDiagnosticResults">
+                            <span>Refresh Log</span>
+                        </button>
+                        <button is="emby-button" type="button" class="raised" id="downloadDiagnosticResults" style="display: none;">
+                            <span>Download Log</span>
+                        </button>
+                        <div class="fieldDescription">Run the "Refresh Recommendations" task first to generate the log.</div>
+
+                        <div id="diagnosticResultsContainer" style="margin-top: 2em;">
+                            <!-- Diagnostic log will be loaded here -->
+                        </div>
+
                         <h3 class="sectionTitle">Documentation</h3>
                         <p>For detailed information about this plugin, visit the GitHub repository.</p>
-                        
+
                         <a href="https://github.com/rdpharr/jellyfin-plugin-localrecs" target="_blank">
                             <button is="emby-button" type="button" class="raised">
                                 <span>View Documentation</span>
@@ -207,9 +222,10 @@
                                 self.loadSetupStatus(page);
                             }
                             
-                            // Load benchmark results when switching to actions tab
+                            // Load benchmark and diagnostic results when switching to actions tab
                             if (item.tab === 'actions') {
                                 self.loadBenchmarkResults(page);
+                                self.loadDiagnosticResults(page);
                             }
                         });
                     });
@@ -555,6 +571,74 @@
                             console.error('Failed to download benchmark results:', error);
                             alert('Failed to download benchmark results.');
                         });
+                },
+
+                /**
+                 * Loads the diagnostic log from the last recommendation run.
+                 */
+                loadDiagnosticResults: function(page) {
+                    var self = this;
+                    var container = page.querySelector('#diagnosticResultsContainer');
+                    var downloadBtn = page.querySelector('#downloadDiagnosticResults');
+
+                    container.innerHTML = '<p>Loading diagnostic log...</p>';
+                    downloadBtn.style.display = 'none';
+
+                    ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Diagnostic/Results'))
+                        .then(function(response) {
+                            if (response && response.results) {
+                                var lastModified = new Date(response.lastModified);
+                                var formattedDate = lastModified.toLocaleString();
+
+                                var html = '<div style="margin-top: 1em;">';
+                                html += '<h3>Last Run: ' + self.escapeHtml(formattedDate) + '</h3>';
+                                html += '<pre style="background: #000; border: 1px solid #333; padding: 1em; overflow-x: auto; white-space: pre; font-family: monospace; font-size: 0.85em;">';
+                                html += self.escapeHtml(response.results);
+                                html += '</pre>';
+                                html += '</div>';
+
+                                container.innerHTML = html;
+                                downloadBtn.style.display = 'inline-block';
+                            } else {
+                                container.innerHTML = '<p>No diagnostic log available.</p>';
+                            }
+                        })
+                        .catch(function(error) {
+                            console.error('Failed to load diagnostic log:', error);
+                            if (error.status === 404) {
+                                container.innerHTML = '<p style="color: #ffc107;">No log found. Run the recommendation refresh task first.</p>';
+                            } else {
+                                container.innerHTML = '<p style="color: #ff5252;">Failed to load diagnostic log.</p>';
+                            }
+                        });
+                },
+
+                /**
+                 * Downloads the diagnostic log as a text file.
+                 */
+                downloadDiagnosticResults: function() {
+                    ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Diagnostic/Results'))
+                        .then(function(response) {
+                            if (response && response.results) {
+                                var blob = new Blob([response.results], { type: 'text/plain' });
+                                var url = window.URL.createObjectURL(blob);
+                                var a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'localrecs-diagnostic-' + new Date().toISOString().replace(/:/g, '-').split('.')[0] + '.txt';
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(function() {
+                                    document.body.removeChild(a);
+                                    window.URL.revokeObjectURL(url);
+                                }, 100);
+                            } else {
+                                alert('No diagnostic log available to download.');
+                            }
+                        })
+                        .catch(function(error) {
+                            console.error('Failed to download diagnostic log:', error);
+                            alert('Failed to download diagnostic log.');
+                        });
                 }
             };
             
@@ -605,6 +689,17 @@
                 page.querySelector('#downloadBenchmarkResults').addEventListener('click', function(e) {
                     e.preventDefault();
                     LocalRecsConfig.downloadBenchmarkResults();
+                });
+
+                // Diagnostic log
+                page.querySelector('#refreshDiagnosticResults').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    LocalRecsConfig.loadDiagnosticResults(page);
+                });
+
+                page.querySelector('#downloadDiagnosticResults').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    LocalRecsConfig.downloadDiagnosticResults();
                 });
             });
             

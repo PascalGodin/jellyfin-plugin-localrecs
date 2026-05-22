@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Jellyfin.Plugin.LocalRecs.Models;
+using Jellyfin.Plugin.LocalRecs.Services;
 using Jellyfin.Plugin.LocalRecs.VirtualLibrary;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
@@ -23,6 +24,7 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         private readonly IUserManager _userManager;
         private readonly ILibraryManager _libraryManager;
         private readonly VirtualLibraryManager _virtualLibraryManager;
+        private readonly DiagnosticLogService _diagnosticLogService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LibraryPathsController"/> class.
@@ -31,17 +33,20 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         /// <param name="userManager">User manager instance.</param>
         /// <param name="libraryManager">Library manager instance.</param>
         /// <param name="virtualLibraryManager">Virtual library manager instance.</param>
+        /// <param name="diagnosticLogService">Diagnostic log service.</param>
         /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
         public LibraryPathsController(
             ILogger<LibraryPathsController> logger,
             IUserManager userManager,
             ILibraryManager libraryManager,
-            VirtualLibraryManager virtualLibraryManager)
+            VirtualLibraryManager virtualLibraryManager,
+            DiagnosticLogService diagnosticLogService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
             _virtualLibraryManager = virtualLibraryManager ?? throw new ArgumentNullException(nameof(virtualLibraryManager));
+            _diagnosticLogService = diagnosticLogService ?? throw new ArgumentNullException(nameof(diagnosticLogService));
         }
 
         /// <summary>
@@ -151,6 +156,56 @@ namespace Jellyfin.Plugin.LocalRecs.Api
             {
                 _logger.LogError(ex, "Failed to download benchmark results");
                 return StatusCode(500, "Failed to download benchmark results");
+            }
+        }
+
+        /// <summary>
+        /// Gets the diagnostic log from the last recommendation run.
+        /// </summary>
+        /// <returns>Log content and last-modified timestamp.</returns>
+        [HttpGet("Diagnostic/Results")]
+        public ActionResult GetDiagnosticResults()
+        {
+            try
+            {
+                var log = _diagnosticLogService.Load();
+                if (log == null)
+                {
+                    return NotFound("No diagnostic log found. Run the recommendation refresh task first.");
+                }
+
+                return Ok(new { results = log.Value.Content, lastModified = log.Value.LastModified });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get diagnostic log");
+                return StatusCode(500, "Failed to retrieve diagnostic log");
+            }
+        }
+
+        /// <summary>
+        /// Downloads the diagnostic log as a text file.
+        /// </summary>
+        /// <returns>Log file download.</returns>
+        [HttpGet("Diagnostic/Download")]
+        public ActionResult DownloadDiagnosticResults()
+        {
+            try
+            {
+                var log = _diagnosticLogService.Load();
+                if (log == null)
+                {
+                    return NotFound("No diagnostic log found. Run the recommendation refresh task first.");
+                }
+
+                var fileBytes = System.Text.Encoding.UTF8.GetBytes(log.Value.Content);
+                var fileName = $"localrecs_diagnostic_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt";
+                return File(fileBytes, "text/plain", fileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to download diagnostic log");
+                return StatusCode(500, "Failed to download diagnostic log");
             }
         }
     }

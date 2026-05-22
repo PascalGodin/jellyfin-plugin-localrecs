@@ -21,6 +21,9 @@ namespace Jellyfin.Plugin.LocalRecs
         /// <inheritdoc />
         public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
         {
+            // Diagnostic log (written after each recommendation run, read by the Actions tab)
+            serviceCollection.AddSingleton<DiagnosticLogService>();
+
             // Phase 3: Embedding Layer Services
             serviceCollection.AddSingleton<LibraryAnalysisService>();
             serviceCollection.AddSingleton<VocabularyBuilder>();
