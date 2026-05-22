@@ -95,6 +95,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add manifest.json
           git commit -m "Update manifest checksum for v${{ steps.version.outputs.tag }}"
+          git pull --rebase origin feature/diagnostic-log
           git push origin HEAD:feature/diagnostic-log
 
       - name: Create GitHub release
