@@ -85,7 +85,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger.LogDebug("Found {Count} watched items for user {UserId}", watchRecords.Count, userId);
 
             // Compute weighted taste vector
-            var tasteVector = ComputeTasteVector(watchRecords, embeddings, config);
+            var (tasteVector, contributions) = ComputeTasteVector(watchRecords, embeddings, config);
 
             // Compute rating statistics from watched items
             var (avgCommunity, avgCritic, communityStdDev, criticStdDev) = ComputeRatingStatistics(watchRecords);
@@ -96,7 +96,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 AverageCommunityRating = avgCommunity,
                 AverageCriticRating = avgCritic,
                 CommunityRatingStdDev = communityStdDev,
-                CriticRatingStdDev = criticStdDev
+                CriticRatingStdDev = criticStdDev,
+                TopWatchContributions = contributions
+                    .OrderByDescending(c => c.Weight)
+                    .Take(10)
+                    .ToList()
             };
 
             _logger.LogDebug(
@@ -199,7 +203,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="embeddings">Item embeddings.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <returns>Normalized taste vector.</returns>
-        private float[] ComputeTasteVector(
+        private (float[] TasteVector, List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)> Contributions) ComputeTasteVector(
             List<WatchRecord> watchRecords,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             PluginConfiguration config)
@@ -214,6 +218,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var dimension = firstEmbedding.Dimensions;
             var weightedSum = new float[dimension];
             float totalWeight = 0;
+            var contributions = new List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)>();
 
             var now = DateTime.UtcNow;
 
@@ -235,6 +240,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     Math.Max(1, record.PlayCount),
                     (float)config.RewatchBoost);
 
+                contributions.Add((record.ItemId, weight, record.IsFavorite, record.PlayCount, daysSince));
+
                 // Accumulate weighted vectors
                 for (int i = 0; i < dimension; i++)
                 {
@@ -253,7 +260,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            return VectorMath.Normalize(weightedSum);
+            return (VectorMath.Normalize(weightedSum), contributions);
         }
 
         /// <summary>

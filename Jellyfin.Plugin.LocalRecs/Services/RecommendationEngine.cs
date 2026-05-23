@@ -25,6 +25,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<RecommendationEngine> _logger;
         private ExclusionCounts _lastExclusionCounts = new ExclusionCounts();
+        private ScoreDistribution _lastScoreDistribution = new ScoreDistribution();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationEngine"/> class.
@@ -47,6 +48,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>Gets the exclusion counts from the most recent <see cref="GenerateRecommendations"/> call.</summary>
         public ExclusionCounts LastExclusionCounts => _lastExclusionCounts;
+
+        /// <summary>Gets the score distribution from the most recent <see cref="GenerateRecommendations"/> call.</summary>
+        public ScoreDistribution LastScoreDistribution => _lastScoreDistribution;
 
         /// <summary>
         /// Generates recommendations for a user.
@@ -102,6 +106,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 maxResults);
 
             _lastExclusionCounts = new ExclusionCounts();
+            _lastScoreDistribution = new ScoreDistribution();
 
             // Check for cold-start scenario
             if (userProfile == null || userProfile.WatchedItemCount < config.MinWatchedItemsForPersonalization)
@@ -147,6 +152,21 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 var score = ScoreCandidate(userProfile, embedding, itemMetadata, config);
 
                 scoredCandidates.Add(score);
+            }
+
+            // Compute score distribution before truncation
+            if (scoredCandidates.Count > 0)
+            {
+                var mean = scoredCandidates.Average(s => s.Score);
+                var stdDev = (float)Math.Sqrt(scoredCandidates.Average(s => Math.Pow(s.Score - mean, 2)));
+                _lastScoreDistribution = new ScoreDistribution
+                {
+                    CandidateCount = scoredCandidates.Count,
+                    MinScore = scoredCandidates.Min(s => s.Score),
+                    MaxScore = scoredCandidates.Max(s => s.Score),
+                    MeanScore = mean,
+                    StdDev = stdDev
+                };
             }
 
             // Sort by score descending and take top N
@@ -494,7 +514,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 .OrderByDescending(m => m.CommunityRating ?? 0)
                 .ThenByDescending(m => m.CriticRating ?? 0)
                 .Take(maxResults)
-                .Select(m => new ScoredRecommendation(m.Id, (m.CommunityRating ?? 0) / 10.0f))
+                .Select(m => new ScoredRecommendation(m.Id, (m.CommunityRating ?? 0) / 10.0f)
+                {
+                    ItemCommunityRating = m.CommunityRating,
+                    ItemCriticRating = m.CriticRating
+                })
                 .ToList();
 
             _logger.LogDebug(

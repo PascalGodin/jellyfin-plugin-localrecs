@@ -44,6 +44,13 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         public int Dimensions => TasteVector.Length;
 
         /// <summary>
+        /// Gets or sets the top watched items by taste influence, ordered by weight descending.
+        /// Each entry: (ItemId, Weight, IsFavorite, PlayCount, DaysSince).
+        /// </summary>
+        public IReadOnlyList<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)> TopWatchContributions { get; set; }
+            = new List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)>();
+
+        /// <summary>
         /// Gets or sets the average community rating (0-10 scale) from watched items.
         /// Null if user has no watched items with community ratings.
         /// </summary>
