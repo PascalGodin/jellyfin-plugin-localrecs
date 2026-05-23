@@ -44,7 +44,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             _config = new PluginConfiguration
             {
                 FavoriteBoost = 2.0,
-                RewatchBoost = 1.5,
                 RecencyDecayHalfLifeDays = 365.0,
                 MinWatchedItemsForPersonalization = 3,
                 MovieRecommendationCount = 25,
@@ -534,7 +533,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             var configWithZeroHalfLife = new PluginConfiguration
             {
                 FavoriteBoost = 2.0,
-                RewatchBoost = 1.5,
                 RecencyDecayHalfLifeDays = 0.0, // Invalid value!
                 MinWatchedItemsForPersonalization = 3
             };
@@ -569,7 +567,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             var configWithSmallHalfLife = new PluginConfiguration
             {
                 FavoriteBoost = 2.0,
-                RewatchBoost = 1.5,
                 RecencyDecayHalfLifeDays = 0.001, // Very small but valid
                 MinWatchedItemsForPersonalization = 3
             };
@@ -617,7 +614,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             var configWithExtremeBoosts = new PluginConfiguration
             {
                 FavoriteBoost = 100.0,  // Extreme
-                RewatchBoost = 50.0,    // Extreme
                 RecencyDecayHalfLifeDays = 1.0, // Very short
                 MinWatchedItemsForPersonalization = 3
             };

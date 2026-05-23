@@ -138,30 +138,26 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit
         }
 
         [Fact]
-        public void ComputeCombinedWeight_AllFactors_ReturnsCompoundedWeight()
+        public void ComputeCombinedWeight_FavoriteItem_AppliesDecayAndBoost()
         {
             var result = WeightCalculator.ComputeCombinedWeight(
                 daysSince: 365,
                 halfLifeDays: 365,
                 isFavorite: true,
-                favoriteBoost: 2.0f,
-                playCount: 2,
-                rewatchBase: 1.5f);
+                favoriteBoost: 2.0f);
 
-            // decay = 0.5, favorite = 0.5 * 2 = 1.0, rewatch = 1.0 * (1 + log_1.5(2)) ≈ 1.0 * 2.71 ≈ 2.71
-            result.Should().BeGreaterThan(1.0f);
+            // decay = 0.5, favorite = 0.5 * 2 = 1.0
+            result.Should().BeApproximately(1.0f, 0.0001f);
         }
 
         [Fact]
-        public void ComputeCombinedWeight_NotFavoriteSingleWatch_AppliesOnlyDecay()
+        public void ComputeCombinedWeight_NonFavorite_AppliesOnlyDecay()
         {
             var result = WeightCalculator.ComputeCombinedWeight(
                 daysSince: 365,
                 halfLifeDays: 365,
                 isFavorite: false,
-                favoriteBoost: 2.0f,
-                playCount: 1,
-                rewatchBase: 1.5f);
+                favoriteBoost: 2.0f);
 
             result.Should().BeApproximately(0.5f, 0.0001f); // Only decay applies
         }

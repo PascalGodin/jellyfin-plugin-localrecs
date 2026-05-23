@@ -8,6 +8,22 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.9",
+        "changelog": "Remove play count from taste weighting + fix TV series recency + watched item features\n- Play count removed as a weighting factor: Jellyfin increments it on every stop-start, making it unreliable. Recency alone handles re-watches — watching an item today resets its decay to 1.0 naturally\n- Rewatch Boost setting removed (no longer applicable)\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item — now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features per item",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.9/jellyfin-plugin-localrecs-v0.6.0.9.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-23T00:00:00Z"
+      },
+      {
+        "version": "0.6.0.8",
+        "changelog": "Fix TV series recency in taste profile + watched item features in log\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item — now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features (e.g. Director: Peter Jackson, Tag: ring, Tag: dwarf)",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.8/jellyfin-plugin-localrecs-v0.6.0.8.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-22T00:00:00Z"
+      },
+      {
         "version": "0.6.0.7",
         "changelog": "PlayCount cap and diagnostic log readability improvements\n- Add Max Play Count for Weighting setting (default: 5) to prevent stop-start events from inflating rewatch weights\n- Diagnostic log: content match shown as % instead of raw cosine, rating delta (\u0394) replaces opaque rating-prox score\n- Diagnostic log: taste signals and top watched items normalized to relative % (top = 100%)\n- Diagnostic log: zero-count exclusions suppressed, only non-zero categories shown\n- Diagnostic log: score distribution shows top/mean ratio and renames \u03c3 to spread\n- Diagnostic log: warm-start/cold-start labels replaced with plain-language descriptions\n- Diagnostic log: rating units added (/10, /100), why line shows feature names without raw weights",
         "targetAbi": "10.11.9.0",

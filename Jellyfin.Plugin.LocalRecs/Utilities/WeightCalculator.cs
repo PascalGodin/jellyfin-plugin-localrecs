@@ -92,25 +92,23 @@ namespace Jellyfin.Plugin.LocalRecs.Utilities
 
         /// <summary>
         /// Computes the combined weight for a watch record.
+        /// Weight = recency decay × favorite boost. Play count is intentionally excluded
+        /// because Jellyfin increments it on every stop-start event, making it unreliable.
+        /// Recency alone handles re-watches: watching an item today resets its decay to 1.0.
         /// </summary>
         /// <param name="daysSince">Days since last watched.</param>
         /// <param name="halfLifeDays">Recency decay half-life.</param>
         /// <param name="isFavorite">Whether the item is favorite.</param>
         /// <param name="favoriteBoost">Favorite boost multiplier.</param>
-        /// <param name="playCount">Number of times played.</param>
-        /// <param name="rewatchBase">Rewatch logarithmic base.</param>
         /// <returns>Combined weight.</returns>
         public static float ComputeCombinedWeight(
             double daysSince,
             double halfLifeDays,
             bool isFavorite,
-            float favoriteBoost,
-            int playCount,
-            float rewatchBase = 1.5f)
+            float favoriteBoost)
         {
             float weight = ExponentialDecay(daysSince, halfLifeDays);
             weight = ApplyFavoriteBoost(weight, isFavorite, favoriteBoost);
-            weight = ApplyRewatchBoost(weight, playCount, rewatchBase);
             return weight;
         }
     }

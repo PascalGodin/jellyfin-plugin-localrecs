@@ -445,8 +445,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"  TV shows           : {config.TvRecommendationCount}");
             sb.AppendLine($"  Min watched        : {config.MinWatchedItemsForPersonalization}");
             sb.AppendLine($"  Favorite boost     : {config.FavoriteBoost:F1}×");
-            sb.AppendLine($"  Rewatch boost      : {config.RewatchBoost:F1}×");
-            sb.AppendLine($"  Play count cap     : {config.MaxPlayCountForWeighting}");
             sb.AppendLine($"  Recency half-life  : {config.RecencyDecayHalfLifeDays:F0} d");
             var proximityLabel = config.EnableRatingProximity
                 ? $"on ({config.RatingProximityWeight:P0} blend)"
@@ -535,15 +533,18 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                                 flags.Add("favorite");
                             }
 
-                            if (c.PlayCount > 1)
-                            {
-                                flags.Add($"{c.PlayCount}× watched");
-                            }
-
                             var age = c.DaysSince < 365 ? $"{c.DaysSince:F0}d ago" : $"{c.DaysSince / 365:F1}y ago";
                             flags.Add(age);
                             var contribPct = maxContribWeight > 0 ? c.Weight / maxContribWeight * 100 : 0;
                             sb.AppendLine($"    {i + 1,3}.  {contribPct,3:F0}%  {watchName}{watchYear}  [{string.Join("  ", flags)}]");
+                            if (embeddings.TryGetValue(c.ItemId, out var watchEmb))
+                            {
+                                var itemFeatures = GetTopTasteFeatures(watchEmb.Vector, vocabulary, 3);
+                                if (itemFeatures.Count > 0)
+                                {
+                                    sb.AppendLine($"                {string.Join(", ", itemFeatures.Select(f => f.Label))}");
+                                }
+                            }
                         }
                     }
                 }

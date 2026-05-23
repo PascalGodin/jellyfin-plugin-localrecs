@@ -16,8 +16,6 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             MovieRecommendationCount = 25;
             TvRecommendationCount = 25;
             FavoriteBoost = 2.0;
-            RewatchBoost = 1.5;
-            MaxPlayCountForWeighting = 5;
             RecencyDecayHalfLifeDays = 365.0;
             MinWatchedItemsForPersonalization = 3;
             MaxVocabularyActors = 500;
@@ -42,17 +40,6 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         /// Gets or sets the boost multiplier for favorite items.
         /// </summary>
         public double FavoriteBoost { get; set; }
-
-        /// <summary>
-        /// Gets or sets the boost multiplier for rewatched items.
-        /// </summary>
-        public double RewatchBoost { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum play count used for rewatch weighting.
-        /// Caps inflated counts caused by stop-start events (default: 5).
-        /// </summary>
-        public int MaxPlayCountForWeighting { get; set; }
 
         /// <summary>
         /// Gets or sets the recency decay half-life in days.
@@ -120,16 +107,6 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             if (FavoriteBoost < 0)
             {
                 errors.Add("FavoriteBoost must be non-negative");
-            }
-
-            if (RewatchBoost < 0)
-            {
-                errors.Add("RewatchBoost must be non-negative");
-            }
-
-            if (MaxPlayCountForWeighting < 1)
-            {
-                errors.Add("MaxPlayCountForWeighting must be at least 1");
             }
 
             if (RecencyDecayHalfLifeDays <= 0)

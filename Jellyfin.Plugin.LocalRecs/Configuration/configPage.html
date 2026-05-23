@@ -62,18 +62,6 @@
                         </div>
                         
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="rewatchBoost">Rewatch Boost:</label>
-                            <input is="emby-input" type="number" id="rewatchBoost" name="rewatchBoost" min="1.0" max="5.0" step="0.1" />
-                            <div class="fieldDescription">Multiplier for rewatched items (default: 1.5)</div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="maxPlayCountForWeighting">Max Play Count for Weighting:</label>
-                            <input is="emby-input" type="number" id="maxPlayCountForWeighting" name="maxPlayCountForWeighting" min="1" max="100" step="1" />
-                            <div class="fieldDescription">Caps play count used for rewatch boost — prevents stop-start events from inflating weights (default: 5)</div>
-                        </div>
-
-                        <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="recencyDecayHalfLife">Recency Decay Half-Life (days):</label>
                             <input is="emby-input" type="number" id="recencyDecayHalfLife" name="recencyDecayHalfLife" min="30" max="1825" />
                             <div class="fieldDescription">Time for watch weight to decay by half (default: 365)</div>
@@ -459,8 +447,6 @@
                             page.querySelector('#tvRecommendationCount').value = config.TvRecommendationCount || 25;
                             page.querySelector('#minWatchedItems').value = config.MinWatchedItemsForPersonalization || 3;
                             page.querySelector('#favoriteBoost').value = config.FavoriteBoost || 2.0;
-                            page.querySelector('#rewatchBoost').value = config.RewatchBoost || 1.5;
-                            page.querySelector('#maxPlayCountForWeighting').value = config.MaxPlayCountForWeighting || 5;
                             page.querySelector('#recencyDecayHalfLife').value = config.RecencyDecayHalfLifeDays || 365;
                             page.querySelector('#maxVocabularyActors').value = config.MaxVocabularyActors || 500;
                             page.querySelector('#maxVocabularyDirectors').value = config.MaxVocabularyDirectors || 0;
@@ -500,8 +486,6 @@
                             config.TvRecommendationCount = parseInt(page.querySelector('#tvRecommendationCount').value);
                             config.MinWatchedItemsForPersonalization = parseInt(page.querySelector('#minWatchedItems').value);
                             config.FavoriteBoost = parseFloat(page.querySelector('#favoriteBoost').value);
-                            config.RewatchBoost = parseFloat(page.querySelector('#rewatchBoost').value);
-                            config.MaxPlayCountForWeighting = parseInt(page.querySelector('#maxPlayCountForWeighting').value);
                             config.RecencyDecayHalfLifeDays = parseFloat(page.querySelector('#recencyDecayHalfLife').value);
                             config.MaxVocabularyActors = parseInt(page.querySelector('#maxVocabularyActors').value);
                             config.MaxVocabularyDirectors = parseInt(page.querySelector('#maxVocabularyDirectors').value);

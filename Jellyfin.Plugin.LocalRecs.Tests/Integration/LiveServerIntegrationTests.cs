@@ -643,7 +643,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             var config = new PluginConfiguration
             {
                 FavoriteBoost = 2.0,
-                RewatchBoost = 1.5,
                 RecencyDecayHalfLifeDays = 365.0
             };
 
@@ -726,8 +725,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                     double daysSince = (DateTime.UtcNow - lastPlayed).TotalDays;
                     weight = (float)Utilities.WeightCalculator.ComputeCombinedWeight(
                         daysSince, config.RecencyDecayHalfLifeDays,
-                        isFavorite, (float)config.FavoriteBoost,
-                        playCount, (float)config.RewatchBoost);
+                        isFavorite, (float)config.FavoriteBoost);
                 }
 
                 weightedVectors.Add((embedding.Vector, weight));
