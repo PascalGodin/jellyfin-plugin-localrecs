@@ -301,6 +301,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     {
                         parts.Add($"critic={rec.ItemCriticRating.Value:F0}");
                     }
+
                     sb.AppendLine($"           {string.Join("  ", parts)}");
                 }
             }
@@ -503,6 +504,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             {
                                 flags.Add($"{c.PlayCount}× watched");
                             }
+
                             var age = c.DaysSince < 365 ? $"{c.DaysSince:F0}d ago" : $"{c.DaysSince / 365:F1}y ago";
                             flags.Add(age);
                             sb.AppendLine($"    {i + 1,3}.  {c.Weight:F3}  {watchName}{watchYear}  [{string.Join("  ", flags)}]");
