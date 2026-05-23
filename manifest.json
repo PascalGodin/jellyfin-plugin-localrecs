@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.6",
+        "changelog": "Expand diagnostic log with 5 new data categories\n- Feature overlap per recommendation: top 5 features driving each pick (taste × item vector)\n- Top watched items by taste weight: top 10 contributors with favorite/rewatch/recency flags\n- Score distribution: min/max/mean/σ across all candidates before top-N cutoff\n- Vocabulary coverage: per-field % of library items that have genres/actors/directors/tags/ratings\n- Cold-start details: community and critic ratings shown per recommended item\n- Diagnostic log toggle (default off) added to Settings tab",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.6/jellyfin-plugin-localrecs-v0.6.0.6.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-22T00:00:00Z"
+      },
+      {
         "version": "0.6.0.5",
         "changelog": "List no-metadata and not-found items in diagnostic log\n- Exclusion summary now shows not-found count alongside no-metadata\n- Items excluded for no-metadata or not-found are listed by name under each exclusion line\n- Lists are per media type (movies / TV) and only shown when non-empty",
         "targetAbi": "10.11.9.0",
