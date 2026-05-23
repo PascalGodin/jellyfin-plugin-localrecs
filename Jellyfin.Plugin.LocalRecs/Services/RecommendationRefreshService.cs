@@ -292,8 +292,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 else if (!warmStart && (rec.ItemCommunityRating.HasValue || rec.ItemCriticRating.HasValue))
                 {
                     var parts = new System.Collections.Generic.List<string>();
-                    if (rec.ItemCommunityRating.HasValue) parts.Add($"community={rec.ItemCommunityRating.Value:F1}");
-                    if (rec.ItemCriticRating.HasValue) parts.Add($"critic={rec.ItemCriticRating.Value:F0}");
+                    if (rec.ItemCommunityRating.HasValue)
+                    {
+                        parts.Add($"community={rec.ItemCommunityRating.Value:F1}");
+                    }
+
+                    if (rec.ItemCriticRating.HasValue)
+                    {
+                        parts.Add($"critic={rec.ItemCriticRating.Value:F0}");
+                    }
                     sb.AppendLine($"           {string.Join("  ", parts)}");
                 }
             }
@@ -487,8 +494,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             var watchName = watchMeta?.Name ?? c.ItemId.ToString();
                             var watchYear = watchMeta?.ReleaseYear > 0 ? $" ({watchMeta.ReleaseYear})" : string.Empty;
                             var flags = new System.Collections.Generic.List<string>();
-                            if (c.IsFavorite) flags.Add("favorite");
-                            if (c.PlayCount > 1) flags.Add($"{c.PlayCount}× watched");
+                            if (c.IsFavorite)
+                            {
+                                flags.Add("favorite");
+                            }
+
+                            if (c.PlayCount > 1)
+                            {
+                                flags.Add($"{c.PlayCount}× watched");
+                            }
                             var age = c.DaysSince < 365 ? $"{c.DaysSince:F0}d ago" : $"{c.DaysSince / 365:F1}y ago";
                             flags.Add(age);
                             sb.AppendLine($"    {i + 1,3}.  {c.Weight:F3}  {watchName}{watchYear}  [{string.Join("  ", flags)}]");
