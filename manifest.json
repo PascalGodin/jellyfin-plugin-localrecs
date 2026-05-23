@@ -9,15 +9,15 @@
     "versions": [
       {
         "version": "0.6.0.9",
-        "changelog": "Remove play count from taste weighting + fix TV series recency + watched item features\n- Play count removed as a weighting factor: Jellyfin increments it on every stop-start, making it unreliable. Recency alone handles re-watches — watching an item today resets its decay to 1.0 naturally\n- Rewatch Boost setting removed (no longer applicable)\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item — now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features per item",
+        "changelog": "Remove play count from taste weighting + fix TV series recency + watched item features\n- Play count removed as a weighting factor: Jellyfin increments it on every stop-start, making it unreliable. Recency alone handles re-watches \u2014 watching an item today resets its decay to 1.0 naturally\n- Rewatch Boost setting removed (no longer applicable)\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item \u2014 now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features per item",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.9/jellyfin-plugin-localrecs-v0.6.0.9.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "36b945bc1a62b18e58e340a19e9ec00a",
         "timestamp": "2026-05-23T00:00:00Z"
       },
       {
         "version": "0.6.0.8",
-        "changelog": "Fix TV series recency in taste profile + watched item features in log\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item — now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features (e.g. Director: Peter Jackson, Tag: ring, Tag: dwarf)",
+        "changelog": "Fix TV series recency in taste profile + watched item features in log\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item \u2014 now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features (e.g. Director: Peter Jackson, Tag: ring, Tag: dwarf)",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.8/jellyfin-plugin-localrecs-v0.6.0.8.zip",
         "checksum": "00000000000000000000000000000000",
