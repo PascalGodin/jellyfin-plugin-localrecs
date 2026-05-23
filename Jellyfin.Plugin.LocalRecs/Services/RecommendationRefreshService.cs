@@ -217,6 +217,38 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
         }
 
+        private static string FormatExclusionLine(string label, int watched, int inProgress, int inaccessible, int noMetadata, int notFound, int final)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (watched > 0)
+            {
+                parts.Add($"{watched} watched");
+            }
+
+            if (inProgress > 0)
+            {
+                parts.Add($"{inProgress} in-progress");
+            }
+
+            if (inaccessible > 0)
+            {
+                parts.Add($"{inaccessible} inaccessible");
+            }
+
+            if (noMetadata > 0)
+            {
+                parts.Add($"{noMetadata} no-metadata");
+            }
+
+            if (notFound > 0)
+            {
+                parts.Add($"{notFound} not-found");
+            }
+
+            var summary = parts.Count > 0 ? string.Join(", ", parts) : "none";
+            return $"  Exclusions ({label}): {summary} → {final} candidates";
+        }
+
         private static void AppendRecommendationList(
             StringBuilder sb,
             string label,
@@ -240,20 +272,20 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 if (rec.CosineSimilarity.HasValue)
                 {
-                    var detail = $"           cosine={rec.CosineSimilarity.Value:F3}";
+                    var detail = $"           content: {rec.CosineSimilarity.Value * 100:F0}%";
 
                     if (rec.RatingProximity.HasValue)
                     {
-                        detail += $"  rating-prox={rec.RatingProximity.Value:F3}";
-
                         var parts = new System.Collections.Generic.List<string>();
 
                         if (rec.ItemCommunityRating.HasValue)
                         {
-                            var s = $"community: item={rec.ItemCommunityRating.Value:F1}";
+                            var s = $"community: {rec.ItemCommunityRating.Value:F1}/10";
                             if (profile?.AverageCommunityRating.HasValue == true)
                             {
-                                s += $" user={profile.AverageCommunityRating.Value:F1}";
+                                var delta = rec.ItemCommunityRating.Value - profile.AverageCommunityRating.Value;
+                                var deltaStr = delta >= 0 ? $"+{delta:F1}" : $"{delta:F1}";
+                                s += $" (avg {profile.AverageCommunityRating.Value:F1}, Δ{deltaStr})";
                             }
 
                             parts.Add(s);
@@ -261,10 +293,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                         if (rec.ItemCriticRating.HasValue)
                         {
-                            var s = $"critic: item={rec.ItemCriticRating.Value:F0}";
+                            var s = $"critic: {rec.ItemCriticRating.Value:F0}/100";
                             if (profile?.AverageCriticRating.HasValue == true)
                             {
-                                s += $" user={profile.AverageCriticRating.Value:F0}";
+                                var delta = rec.ItemCriticRating.Value - profile.AverageCriticRating.Value;
+                                var deltaStr = delta >= 0 ? $"+{delta:F0}" : $"{delta:F0}";
+                                s += $" (avg {profile.AverageCriticRating.Value:F0}, Δ{deltaStr})";
                             }
 
                             parts.Add(s);
@@ -272,20 +306,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                         if (parts.Count > 0)
                         {
-                            detail += $"  [{string.Join(" | ", parts)}]";
+                            detail += $"  {string.Join("  ", parts)}";
                         }
                     }
 
                     sb.AppendLine(detail);
 
-                    // Feature overlap: which taste features most drove this recommendation
                     if (profile != null && embeddings != null && vocabulary != null
                         && embeddings.TryGetValue(rec.ItemId, out var itemEmb))
                     {
                         var overlap = GetFeatureOverlap(profile.TasteVector, itemEmb.Vector, vocabulary);
                         if (overlap.Count > 0)
                         {
-                            sb.AppendLine($"           why: {string.Join("  ", overlap.Select(f => $"{f.Label} ({f.Weight:F3})"))}");
+                            sb.AppendLine($"           why: {string.Join(", ", overlap.Select(f => f.Label))}");
                         }
                     }
                 }
@@ -294,12 +327,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     var parts = new System.Collections.Generic.List<string>();
                     if (rec.ItemCommunityRating.HasValue)
                     {
-                        parts.Add($"community={rec.ItemCommunityRating.Value:F1}");
+                        parts.Add($"community: {rec.ItemCommunityRating.Value:F1}/10");
                     }
 
                     if (rec.ItemCriticRating.HasValue)
                     {
-                        parts.Add($"critic={rec.ItemCriticRating.Value:F0}");
+                        parts.Add($"critic: {rec.ItemCriticRating.Value:F0}/100");
                     }
 
                     sb.AppendLine($"           {string.Join("  ", parts)}");
@@ -413,6 +446,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"  Min watched        : {config.MinWatchedItemsForPersonalization}");
             sb.AppendLine($"  Favorite boost     : {config.FavoriteBoost:F1}×");
             sb.AppendLine($"  Rewatch boost      : {config.RewatchBoost:F1}×");
+            sb.AppendLine($"  Play count cap     : {config.MaxPlayCountForWeighting}");
             sb.AppendLine($"  Recency half-life  : {config.RecencyDecayHalfLifeDays:F0} d");
             var proximityLabel = config.EnableRatingProximity
                 ? $"on ({config.RatingProximityWeight:P0} blend)"
@@ -471,22 +505,23 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 sb.AppendLine($"USER: {username}  ({userDuration.TotalSeconds:F2} s)");
 
                 var profileLabel = warmStart
-                    ? $"warm-start ({watchedCount} watched items)"
-                    : $"cold-start ({watchedCount} watched items, threshold: {config.MinWatchedItemsForPersonalization})";
+                    ? $"personalized ({watchedCount} items watched)"
+                    : $"cold-start — rating-based ({watchedCount} items, threshold: {config.MinWatchedItemsForPersonalization})";
                 sb.AppendLine($"  Profile : {profileLabel}");
 
                 if (warmStart && profile != null)
                 {
                     var communityStr = profile.AverageCommunityRating.HasValue
-                        ? $"community avg={profile.AverageCommunityRating.Value:F1} (±{profile.CommunityRatingStdDev:F1})"
-                        : "community avg=n/a";
+                        ? $"community {profile.AverageCommunityRating.Value:F1}/10 (±{profile.CommunityRatingStdDev:F1})"
+                        : "community n/a";
                     var criticStr = profile.AverageCriticRating.HasValue
-                        ? $"critic avg={profile.AverageCriticRating.Value:F0} (±{profile.CriticRatingStdDev:F0})"
-                        : "critic avg=n/a";
+                        ? $"critic {profile.AverageCriticRating.Value:F0}/100 (±{profile.CriticRatingStdDev:F0})"
+                        : "critic n/a";
                     sb.AppendLine($"  Ratings : {communityStr}  {criticStr}");
 
                     if (profile.TopWatchContributions.Count > 0)
                     {
+                        var maxContribWeight = profile.TopWatchContributions[0].Weight;
                         sb.AppendLine($"  Top watched (by taste weight):");
                         for (var i = 0; i < profile.TopWatchContributions.Count; i++)
                         {
@@ -507,19 +542,22 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                             var age = c.DaysSince < 365 ? $"{c.DaysSince:F0}d ago" : $"{c.DaysSince / 365:F1}y ago";
                             flags.Add(age);
-                            sb.AppendLine($"    {i + 1,3}.  {c.Weight:F3}  {watchName}{watchYear}  [{string.Join("  ", flags)}]");
+                            var contribPct = maxContribWeight > 0 ? c.Weight / maxContribWeight * 100 : 0;
+                            sb.AppendLine($"    {i + 1,3}.  {contribPct,3:F0}%  {watchName}{watchYear}  [{string.Join("  ", flags)}]");
                         }
                     }
                 }
 
                 if (warmStart)
                 {
-                    sb.AppendLine($"  Score dist (movies): {movieScoreDist.CandidateCount} candidates  min={movieScoreDist.MinScore:F3} max={movieScoreDist.MaxScore:F3} mean={movieScoreDist.MeanScore:F3} σ={movieScoreDist.StdDev:F3}");
-                    sb.AppendLine($"  Score dist (TV)    : {tvScoreDist.CandidateCount} candidates  min={tvScoreDist.MinScore:F3} max={tvScoreDist.MaxScore:F3} mean={tvScoreDist.MeanScore:F3} σ={tvScoreDist.StdDev:F3}");
-                    sb.AppendLine($"  Exclusions (movies): {movieExclusions.Watched} watched, {movieExclusions.InProgress} in-progress, {movieExclusions.Inaccessible} inaccessible, {movieExclusions.NoMetadata} no-metadata, {movieExclusions.NotFound} not-found → {movieExclusions.Final} candidates");
+                    var movieTopRatio = movieScoreDist.MeanScore > 0 ? movieScoreDist.MaxScore / movieScoreDist.MeanScore : 0f;
+                    var tvTopRatio = tvScoreDist.MeanScore > 0 ? tvScoreDist.MaxScore / tvScoreDist.MeanScore : 0f;
+                    sb.AppendLine($"  Score dist (movies): {movieScoreDist.CandidateCount} candidates  min={movieScoreDist.MinScore:F3} max={movieScoreDist.MaxScore:F3} mean={movieScoreDist.MeanScore:F3} spread={movieScoreDist.StdDev:F3}  (top {movieTopRatio:F1}× mean)");
+                    sb.AppendLine($"  Score dist (TV)    : {tvScoreDist.CandidateCount} candidates  min={tvScoreDist.MinScore:F3} max={tvScoreDist.MaxScore:F3} mean={tvScoreDist.MeanScore:F3} spread={tvScoreDist.StdDev:F3}  (top {tvTopRatio:F1}× mean)");
+                    sb.AppendLine(FormatExclusionLine("movies", movieExclusions.Watched, movieExclusions.InProgress, movieExclusions.Inaccessible, movieExclusions.NoMetadata, movieExclusions.NotFound, movieExclusions.Final));
                     AppendExclusionItems(sb, "no-metadata", movieExclusions.NoMetadataItems);
                     AppendExclusionItems(sb, "not-found", movieExclusions.NotFoundItems);
-                    sb.AppendLine($"  Exclusions (TV)    : {tvExclusions.SeriesWatched} watched, {tvExclusions.InProgress} in-progress, {tvExclusions.Inaccessible} inaccessible, {tvExclusions.NoMetadata} no-metadata, {tvExclusions.NotFound} not-found → {tvExclusions.Final} candidates");
+                    sb.AppendLine(FormatExclusionLine("TV", tvExclusions.SeriesWatched, tvExclusions.InProgress, tvExclusions.Inaccessible, tvExclusions.NoMetadata, tvExclusions.NotFound, tvExclusions.Final));
                     AppendExclusionItems(sb, "no-metadata", tvExclusions.NoMetadataItems);
                     AppendExclusionItems(sb, "not-found", tvExclusions.NotFoundItems);
 
@@ -528,10 +566,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         var topFeatures = GetTopTasteFeatures(profile.TasteVector, vocabulary);
                         if (topFeatures.Count > 0)
                         {
+                            var maxTasteWeight = topFeatures[0].Weight;
                             sb.AppendLine($"  Top taste signals:");
                             for (var i = 0; i < topFeatures.Count; i++)
                             {
-                                sb.AppendLine($"    {i + 1,3}.  {topFeatures[i].Weight:F3}  {topFeatures[i].Label}");
+                                var tastePct = maxTasteWeight > 0 ? topFeatures[i].Weight / maxTasteWeight * 100 : 0;
+                                sb.AppendLine($"    {i + 1,3}.  {tastePct,3:F0}%  {topFeatures[i].Label}");
                             }
                         }
                     }

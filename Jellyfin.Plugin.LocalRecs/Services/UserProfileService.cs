@@ -237,7 +237,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     config.RecencyDecayHalfLifeDays,
                     record.IsFavorite,
                     (float)config.FavoriteBoost,
-                    Math.Max(1, record.PlayCount),
+                    Math.Max(1, Math.Min(record.PlayCount, config.MaxPlayCountForWeighting)),
                     (float)config.RewatchBoost);
 
                 contributions.Add((record.ItemId, weight, record.IsFavorite, record.PlayCount, daysSince));

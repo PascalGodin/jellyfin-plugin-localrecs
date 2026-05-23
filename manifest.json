@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.7",
+        "changelog": "PlayCount cap and diagnostic log readability improvements\n- Add Max Play Count for Weighting setting (default: 5) to prevent stop-start events from inflating rewatch weights\n- Diagnostic log: content match shown as % instead of raw cosine, rating delta (Δ) replaces opaque rating-prox score\n- Diagnostic log: taste signals and top watched items normalized to relative % (top = 100%)\n- Diagnostic log: zero-count exclusions suppressed, only non-zero categories shown\n- Diagnostic log: score distribution shows top/mean ratio and renames σ to spread\n- Diagnostic log: warm-start/cold-start labels replaced with plain-language descriptions\n- Diagnostic log: rating units added (/10, /100), why line shows feature names without raw weights",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.7/jellyfin-plugin-localrecs-v0.6.0.7.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-22T00:00:00Z"
+      },
+      {
         "version": "0.6.0.6",
         "changelog": "Expand diagnostic log with 5 new data categories\n- Feature overlap per recommendation: top 5 features driving each pick (taste \u00d7 item vector)\n- Top watched items by taste weight: top 10 contributors with favorite/rewatch/recency flags\n- Score distribution: min/max/mean/\u03c3 across all candidates before top-N cutoff\n- Vocabulary coverage: per-field % of library items that have genres/actors/directors/tags/ratings\n- Cold-start details: community and critic ratings shown per recommended item\n- Diagnostic log toggle (default off) added to Settings tab",
         "targetAbi": "10.11.9.0",
