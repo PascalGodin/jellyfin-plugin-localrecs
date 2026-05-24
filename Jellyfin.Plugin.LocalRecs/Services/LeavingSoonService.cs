@@ -475,7 +475,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     ParentId = series.Id,
                     IncludeItemTypes = new[] { BaseItemKind.Episode },
                     Recursive = true,
-                    OrderBy = new[] { (Jellyfin.Data.Enums.ItemSortBy.DatePlayed, Jellyfin.Data.Enums.SortOrder.Descending) },
+                    OrderBy = new[] { (Jellyfin.Data.Enums.ItemSortBy.DatePlayed, Jellyfin.Database.Implementations.Enums.SortOrder.Descending) },
                     Limit = 1
                 });
                 var lastEpisode = episodes.FirstOrDefault();
