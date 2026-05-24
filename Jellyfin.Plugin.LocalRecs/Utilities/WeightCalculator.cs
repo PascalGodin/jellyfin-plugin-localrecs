@@ -76,7 +76,7 @@ namespace Jellyfin.Plugin.LocalRecs.Utilities
                 throw new ArgumentException("Anchor boost cannot be negative", nameof(recentWatchBoost));
             }
 
-            return decay * (1.0f + recentWatchBoost * decay);
+            return decay * (1.0f + (recentWatchBoost * decay));
         }
 
         /// <summary>
