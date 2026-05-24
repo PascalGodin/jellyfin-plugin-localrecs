@@ -12,7 +12,7 @@
         "changelog": "Add Leaving Soon scoring to diagnostic log\n- Leaving Soon: flag movies and TV series with the lowest max-user cosine similarity across all taste profiles\n- Reuses pre-computed embeddings and user profiles from the recommendation run (no redundant computation)\n- Flagged items and removal candidates printed to the diagnostic log for validation before virtual library creation\n- Configurable: LeavingSoonEnabled, LeavingSoonMovieCount (25), LeavingSoonTvCount (25), LeavingSoonMinAgeDays (180), LeavingSoonDwellDays (30)\n- Items protected if saved, favorited, partially watched, recently added, or in a collection with any watched item\n- State persisted across runs: items dwell in Leaving Soon for LeavingSoonDwellDays before promoted to Removal Candidates",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.11/jellyfin-plugin-localrecs-v0.6.0.11.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "5d035cfbd23d472efd47e880a20764e0",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
