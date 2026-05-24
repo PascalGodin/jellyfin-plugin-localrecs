@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.10",
+        "changelog": "Replace rewatch boost with Recent Watch Boost\n- Remove PlayCount-based rewatch boost (unreliable due to Jellyfin stop-start inflation)\n- Add Recent Watch Boost: weight = decay × (1 + recentWatchBoost × decay) × favoriteBoost\n- Just-watched items get 2× their decay weight by default (recentWatchBoost=1.0)\n- Boost fades naturally using the existing recency half-life — no hard window cutoff\n- Rewatches implicitly rewarded: re-watching resets LastPlayedDate to today, giving full boost automatically\n- Optimize TV series date query: single OrderBy DatePlayed descending query instead of full episode scan",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.10/jellyfin-plugin-localrecs-v0.6.0.10.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-24T00:00:00Z"
+      },
+      {
         "version": "0.6.0.9",
         "changelog": "Remove play count from taste weighting + fix TV series recency + watched item features\n- Play count removed as a weighting factor: Jellyfin increments it on every stop-start, making it unreliable. Recency alone handles re-watches \u2014 watching an item today resets its decay to 1.0 naturally\n- Rewatch Boost setting removed (no longer applicable)\n- Fix: TV series showed '0d ago' because Jellyfin stores LastPlayedDate on episodes, not on the series item \u2014 now queries the most recently watched episode for the correct date\n- Diagnostic log: top watched items now show their top 3 driving features per item",
         "targetAbi": "10.11.9.0",
