@@ -12,7 +12,7 @@
         "changelog": "Improve Leaving Soon diagnostics and allow watched items\n- Diagnostic log: LEAVING SOON section now shows skip-reason breakdown (profiles used, safe collections, scored counts, and per-reason skipped counts)\n- Watched items can now appear in Leaving Soon; only favorited and in-progress items are protected\n- Fix: TV series min-age calculation now uses most-recently-watched episode date (same fix as recommendation engine)\n- Collection protection now requires a favorited or in-progress item in the collection, not just a watched one",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.13/jellyfin-plugin-localrecs-v0.6.0.13.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "8f31443747809fba613f63650578ecd7",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
