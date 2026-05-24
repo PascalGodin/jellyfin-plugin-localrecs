@@ -97,6 +97,42 @@
                             <div class="fieldDescription checkboxFieldDescription">Write a detailed log after each refresh with per-item score breakdowns, exclusion details, and taste signals. Viewable in the Actions tab.</div>
                         </div>
 
+                        <h2 class="sectionTitle">Leaving Soon</h2>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="leavingSoonEnabled" name="leavingSoonEnabled" />
+                                <span>Enable Leaving Soon</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Flag items with the lowest cosine similarity across all user taste profiles as candidates for removal.</div>
+                        </div>
+
+                        <div id="leavingSoonSettingsContainer">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonMovieCount">Leaving Soon Movie Count:</label>
+                                <input is="emby-input" type="number" id="leavingSoonMovieCount" name="leavingSoonMovieCount" min="0" max="200" />
+                                <div class="fieldDescription">Number of movies to flag as Leaving Soon (default: 25)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonTvCount">Leaving Soon TV Count:</label>
+                                <input is="emby-input" type="number" id="leavingSoonTvCount" name="leavingSoonTvCount" min="0" max="200" />
+                                <div class="fieldDescription">Number of TV series to flag as Leaving Soon (default: 25)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonMinAgeDays">Leaving Soon Min Age (days):</label>
+                                <input is="emby-input" type="number" id="leavingSoonMinAgeDays" name="leavingSoonMinAgeDays" min="0" max="3650" />
+                                <div class="fieldDescription">Minimum item age before it can appear in Leaving Soon (default: 180)</div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="leavingSoonDwellDays">Leaving Soon Dwell Days:</label>
+                                <input is="emby-input" type="number" id="leavingSoonDwellDays" name="leavingSoonDwellDays" min="1" max="365" />
+                                <div class="fieldDescription">Days an item stays flagged before being promoted to Removal Candidates (default: 30)</div>
+                            </div>
+                        </div>
+
                         <h2 class="sectionTitle">Performance Tuning</h2>
                         
                         <div class="inputContainer">
@@ -461,6 +497,11 @@
                             page.querySelector('#enableRatingProximity').checked = config.EnableRatingProximity || false;
                             page.querySelector('#ratingProximityWeight').value = config.RatingProximityWeight || 0.2;
                             page.querySelector('#enableDiagnosticLog').checked = config.EnableDiagnosticLog || false;
+                            page.querySelector('#leavingSoonEnabled').checked = config.LeavingSoonEnabled !== undefined ? config.LeavingSoonEnabled : true;
+                            page.querySelector('#leavingSoonMovieCount').value = config.LeavingSoonMovieCount !== undefined ? config.LeavingSoonMovieCount : 25;
+                            page.querySelector('#leavingSoonTvCount').value = config.LeavingSoonTvCount !== undefined ? config.LeavingSoonTvCount : 25;
+                            page.querySelector('#leavingSoonMinAgeDays').value = config.LeavingSoonMinAgeDays !== undefined ? config.LeavingSoonMinAgeDays : 180;
+                            page.querySelector('#leavingSoonDwellDays').value = config.LeavingSoonDwellDays !== undefined ? config.LeavingSoonDwellDays : 30;
 
                             self.updateFieldVisibility(page);
                             Dashboard.hideLoadingMsg();
@@ -478,6 +519,10 @@
                     var enableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                     var weightContainer = page.querySelector('#ratingProximityWeightContainer');
                     weightContainer.style.display = enableRatingProximity ? 'block' : 'none';
+
+                    var leavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
+                    var leavingSoonContainer = page.querySelector('#leavingSoonSettingsContainer');
+                    leavingSoonContainer.style.display = leavingSoonEnabled ? 'block' : 'none';
                 },
                 
                 /**
@@ -501,6 +546,11 @@
                             config.EnableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                             config.RatingProximityWeight = parseFloat(page.querySelector('#ratingProximityWeight').value);
                             config.EnableDiagnosticLog = page.querySelector('#enableDiagnosticLog').checked;
+                            config.LeavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
+                            config.LeavingSoonMovieCount = parseInt(page.querySelector('#leavingSoonMovieCount').value);
+                            config.LeavingSoonTvCount = parseInt(page.querySelector('#leavingSoonTvCount').value);
+                            config.LeavingSoonMinAgeDays = parseInt(page.querySelector('#leavingSoonMinAgeDays').value);
+                            config.LeavingSoonDwellDays = parseInt(page.querySelector('#leavingSoonDwellDays').value);
 
                             return ApiClient.updatePluginConfiguration(self.pluginId, config);
                         })
@@ -676,6 +726,10 @@
                 
                 // Setup event listeners for settings
                 page.querySelector('#enableRatingProximity').addEventListener('change', function() {
+                    LocalRecsConfig.updateFieldVisibility(page);
+                });
+
+                page.querySelector('#leavingSoonEnabled').addEventListener('change', function() {
                     LocalRecsConfig.updateFieldVisibility(page);
                 });
                 
