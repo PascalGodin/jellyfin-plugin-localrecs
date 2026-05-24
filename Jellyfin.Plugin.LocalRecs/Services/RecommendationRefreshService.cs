@@ -446,6 +446,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"  Min watched        : {config.MinWatchedItemsForPersonalization}");
             sb.AppendLine($"  Favorite boost     : {config.FavoriteBoost:F1}×");
             sb.AppendLine($"  Recency half-life  : {config.RecencyDecayHalfLifeDays:F0} d");
+            sb.AppendLine($"  Recent watch emph. : {config.RecentWatchBoost:F1}");
             var proximityLabel = config.EnableRatingProximity
                 ? $"on ({config.RatingProximityWeight:P0} blend)"
                 : "off";

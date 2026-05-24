@@ -251,7 +251,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     daysSince,
                     config.RecencyDecayHalfLifeDays,
                     record.IsFavorite,
-                    (float)config.FavoriteBoost);
+                    (float)config.FavoriteBoost,
+                    (float)config.RecentWatchBoost);
 
                 contributions.Add((record.ItemId, weight, record.IsFavorite, record.PlayCount, daysSince));
 

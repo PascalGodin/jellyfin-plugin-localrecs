@@ -88,78 +88,100 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit
         }
 
         [Fact]
-        public void ApplyRewatchBoost_SingleWatch_ReturnsBaseWeight()
+        public void ApplyRecentWatchBoost_ZeroBoost_ReturnsDecay()
         {
-            var result = WeightCalculator.ApplyRewatchBoost(baseWeight: 1.0f, playCount: 1, rewatchBase: 1.5f);
+            var result = WeightCalculator.ApplyRecentWatchBoost(decay: 0.5f, recentWatchBoost: 0.0f);
 
-            result.Should().Be(1.0f);
+            result.Should().BeApproximately(0.5f, 0.0001f);
         }
 
         [Fact]
-        public void ApplyRewatchBoost_MultipleWatches_AppliesLogarithmicBoost()
+        public void ApplyRecentWatchBoost_JustWatchedWithBoost_DoublesWeight()
         {
-            var result = WeightCalculator.ApplyRewatchBoost(baseWeight: 1.0f, playCount: 3, rewatchBase: 1.5f);
+            // decay=1.0 (watched today), recentWatchBoost=1.0 → 1.0 × (1 + 1.0 × 1.0) = 2.0
+            var result = WeightCalculator.ApplyRecentWatchBoost(decay: 1.0f, recentWatchBoost: 1.0f);
 
-            // log_1.5(3) ≈ 2.71, so boost = 1 + 2.71 = 3.71
-            result.Should().BeGreaterThan(1.0f);
-            result.Should().BeApproximately(3.71f, 0.1f);
+            result.Should().BeApproximately(2.0f, 0.0001f);
         }
 
         [Fact]
-        public void ApplyRewatchBoost_NegativeBaseWeight_ThrowsArgumentException()
+        public void ApplyRecentWatchBoost_OldItemsLessAmplified()
         {
-            Action act = () => WeightCalculator.ApplyRewatchBoost(baseWeight: -1.0f, playCount: 2, rewatchBase: 1.5f);
+            // Recent item (decay=1.0) gets 2× with boost=1; older item (decay=0.5) only 1.25×
+            var recentWeight = WeightCalculator.ApplyRecentWatchBoost(decay: 1.0f, recentWatchBoost: 1.0f);
+            var oldWeight = WeightCalculator.ApplyRecentWatchBoost(decay: 0.5f, recentWatchBoost: 1.0f);
 
-            act.Should().Throw<ArgumentException>().WithParameterName("baseWeight");
+            var recentRatio = recentWeight / 1.0f; // vs no-boost baseline
+            var oldRatio = oldWeight / 0.5f;
+
+            recentRatio.Should().BeGreaterThan(oldRatio, "anchor boost amplifies recent items more than old ones");
         }
 
         [Fact]
-        public void ApplyRewatchBoost_ZeroPlayCount_ThrowsArgumentException()
+        public void ApplyRecentWatchBoost_NegativeDecay_ThrowsArgumentException()
         {
-            Action act = () => WeightCalculator.ApplyRewatchBoost(baseWeight: 1.0f, playCount: 0, rewatchBase: 1.5f);
+            Action act = () => WeightCalculator.ApplyRecentWatchBoost(decay: -0.1f, recentWatchBoost: 1.0f);
 
-            act.Should().Throw<ArgumentException>().WithParameterName("playCount");
+            act.Should().Throw<ArgumentException>().WithParameterName("decay");
         }
 
         [Fact]
-        public void ApplyRewatchBoost_RewatchBaseOne_ThrowsArgumentException()
+        public void ApplyRecentWatchBoost_DecayAboveOne_ThrowsArgumentException()
         {
-            Action act = () => WeightCalculator.ApplyRewatchBoost(baseWeight: 1.0f, playCount: 2, rewatchBase: 1.0f);
+            Action act = () => WeightCalculator.ApplyRecentWatchBoost(decay: 1.1f, recentWatchBoost: 1.0f);
 
-            act.Should().Throw<ArgumentException>().WithParameterName("rewatchBase");
+            act.Should().Throw<ArgumentException>().WithParameterName("decay");
         }
 
         [Fact]
-        public void ApplyRewatchBoost_RewatchBaseLessThanOne_ThrowsArgumentException()
+        public void ApplyRecentWatchBoost_NegativeAnchorBoost_ThrowsArgumentException()
         {
-            Action act = () => WeightCalculator.ApplyRewatchBoost(baseWeight: 1.0f, playCount: 2, rewatchBase: 0.5f);
+            Action act = () => WeightCalculator.ApplyRecentWatchBoost(decay: 0.5f, recentWatchBoost: -1.0f);
 
-            act.Should().Throw<ArgumentException>().WithParameterName("rewatchBase");
+            act.Should().Throw<ArgumentException>().WithParameterName("recentWatchBoost");
         }
 
         [Fact]
         public void ComputeCombinedWeight_FavoriteItem_AppliesDecayAndBoost()
         {
+            // recentWatchBoost=0: weight = decay × (1 + 0) × favoriteBoost = decay × favoriteBoost
+            // decay=0.5, favorite=0.5×2=1.0
             var result = WeightCalculator.ComputeCombinedWeight(
                 daysSince: 365,
                 halfLifeDays: 365,
                 isFavorite: true,
-                favoriteBoost: 2.0f);
+                favoriteBoost: 2.0f,
+                recentWatchBoost: 0.0f);
 
-            // decay = 0.5, favorite = 0.5 * 2 = 1.0
             result.Should().BeApproximately(1.0f, 0.0001f);
         }
 
         [Fact]
         public void ComputeCombinedWeight_NonFavorite_AppliesOnlyDecay()
         {
+            // recentWatchBoost=0: weight = decay × 1 = decay
             var result = WeightCalculator.ComputeCombinedWeight(
                 daysSince: 365,
                 halfLifeDays: 365,
                 isFavorite: false,
-                favoriteBoost: 2.0f);
+                favoriteBoost: 2.0f,
+                recentWatchBoost: 0.0f);
 
-            result.Should().BeApproximately(0.5f, 0.0001f); // Only decay applies
+            result.Should().BeApproximately(0.5f, 0.0001f);
+        }
+
+        [Fact]
+        public void ComputeCombinedWeight_WithAnchorBoost_AmplifiiesJustWatchedItems()
+        {
+            // decay=1.0 (watched today), recentWatchBoost=1.0 → 1.0 × (1 + 1.0) × 1 = 2.0
+            var result = WeightCalculator.ComputeCombinedWeight(
+                daysSince: 0,
+                halfLifeDays: 365,
+                isFavorite: false,
+                favoriteBoost: 1.0f,
+                recentWatchBoost: 1.0f);
+
+            result.Should().BeApproximately(2.0f, 0.0001f);
         }
 
     }

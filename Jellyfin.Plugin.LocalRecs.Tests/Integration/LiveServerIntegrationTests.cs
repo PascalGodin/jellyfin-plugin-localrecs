@@ -725,7 +725,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                     double daysSince = (DateTime.UtcNow - lastPlayed).TotalDays;
                     weight = (float)Utilities.WeightCalculator.ComputeCombinedWeight(
                         daysSince, config.RecencyDecayHalfLifeDays,
-                        isFavorite, (float)config.FavoriteBoost);
+                        isFavorite, (float)config.FavoriteBoost, (float)config.RecentWatchBoost);
                 }
 
                 weightedVectors.Add((embedding.Vector, weight));

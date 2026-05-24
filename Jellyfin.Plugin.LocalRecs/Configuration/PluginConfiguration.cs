@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             MaxVocabularyActors = 500;
             MaxVocabularyDirectors = 0;
             MaxVocabularyTags = 500;
+            RecentWatchBoost = 1.0;
             EnableRatingProximity = true;
             RatingProximityWeight = 0.2;
             EnableDiagnosticLog = false;
@@ -65,6 +66,14 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         /// Gets or sets the maximum vocabulary size for tags (0 = unlimited).
         /// </summary>
         public int MaxVocabularyTags { get; set; }
+
+        /// <summary>
+        /// Gets or sets the recent recent watch boost scalar.
+        /// Amplifies the weight of recently watched items relative to older items in the taste profile.
+        /// Uses the existing recency decay: weight = decay × (1 + anchorBoost × decay).
+        /// 0 = no boost (pure decay), 1 = just-watched items get 2× their decay weight (default).
+        /// </summary>
+        public double RecentWatchBoost { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to enable rating proximity weighting.
@@ -132,6 +141,11 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             if (MaxVocabularyTags < 0)
             {
                 errors.Add("MaxVocabularyTags must be non-negative (0 = unlimited)");
+            }
+
+            if (RecentWatchBoost < 0)
+            {
+                errors.Add("RecentWatchBoost must be non-negative");
             }
 
             if (RatingProximityWeight < 0 || RatingProximityWeight > 1)
