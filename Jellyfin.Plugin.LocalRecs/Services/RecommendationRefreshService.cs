@@ -201,6 +201,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             // Run Leaving Soon scoring using the profiles already computed above
             LeavingSoonState? leavingSoonState = null;
+            LeavingSoonDiagnostics? leavingSoonDiagnostics = null;
             if (config.LeavingSoonEnabled)
             {
                 var eligibleProfiles = userLogEntries
@@ -208,17 +209,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     .Select(e => e.Profile!)
                     .ToList();
 
-                leavingSoonState = _leavingSoonService.Refresh(
+                var lsResult = _leavingSoonService.Refresh(
                     metadata.Values.ToList(),
                     embeddings,
                     eligibleProfiles,
                     config,
                     System.Threading.CancellationToken.None);
+                leavingSoonState = lsResult.State;
+                leavingSoonDiagnostics = lsResult.Diagnostics;
             }
 
             if (config.EnableDiagnosticLog)
             {
-                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, config, libraryScan, vocabularyBuild, embeddingCompute);
+                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, config, libraryScan, vocabularyBuild, embeddingCompute);
             }
 
             return Task.FromResult(results);
@@ -439,6 +442,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist,
                 TimeSpan UserDuration)> userEntries,
             LeavingSoonState? leavingSoonState,
+            LeavingSoonDiagnostics? leavingSoonDiagnostics,
             PluginConfiguration config,
             TimeSpan libraryScan,
             TimeSpan vocabularyBuild,
@@ -613,6 +617,24 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 sb.AppendLine(dash);
                 sb.AppendLine("LEAVING SOON");
                 sb.AppendLine();
+
+                if (leavingSoonDiagnostics != null)
+                {
+                    sb.AppendLine($"  Profiles used     : {leavingSoonDiagnostics.EligibleProfileCount}");
+                    sb.AppendLine($"  Safe collections  : {leavingSoonDiagnostics.SafeCollectionCount}");
+                    sb.AppendLine();
+                    sb.AppendLine("  Discovery:");
+                    sb.AppendLine($"    Scored           : {leavingSoonDiagnostics.ScoredMovies} movies, {leavingSoonDiagnostics.ScoredTv} TV");
+                    sb.AppendLine($"    Skipped:");
+                    sb.AppendLine($"      Already removal  : {leavingSoonDiagnostics.SkippedAlreadyRemoval}");
+                    sb.AppendLine($"      No metadata      : {leavingSoonDiagnostics.SkippedNoMetadata}");
+                    sb.AppendLine($"      Safe collection  : {leavingSoonDiagnostics.SkippedSafeCollection}");
+                    sb.AppendLine($"      No embedding     : {leavingSoonDiagnostics.SkippedNoEmbedding}");
+                    sb.AppendLine($"      Favorited/active : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
+                    sb.AppendLine($"      Too young (<{config.LeavingSoonMinAgeDays}d): {leavingSoonDiagnostics.SkippedTooYoung}");
+                    sb.AppendLine($"      Not found        : {leavingSoonDiagnostics.SkippedNotFound}");
+                    sb.AppendLine();
+                }
 
                 var now = DateTime.UtcNow;
 

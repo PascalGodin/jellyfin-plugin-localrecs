@@ -62,8 +62,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="eligibleProfiles">Pre-computed taste profiles for users with enough watch history.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Updated Leaving Soon state after this run.</returns>
-        public LeavingSoonState Refresh(
+        /// <returns>Updated Leaving Soon state and discovery diagnostics after this run.</returns>
+        public (LeavingSoonState State, LeavingSoonDiagnostics Diagnostics) Refresh(
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
@@ -109,13 +109,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             // Pass 3: Discover new candidates using pre-computed embeddings and profiles
+            LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
             {
-                Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, users, config, minAge, now);
+                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, users, config, minAge, now);
             }
             else
             {
                 _logger.LogDebug("Leaving Soon discovery skipped: no users have enough watch history");
+                diagnostics = new LeavingSoonDiagnostics();
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -127,7 +129,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 state.FlaggedItems.Count,
                 state.RemovalCandidates.Count);
 
-            return state;
+            return (state, diagnostics);
         }
 
         private static Dictionary<string, MediaItemMetadata> BuildItemIndex(IReadOnlyList<MediaItemMetadata> allItems)
@@ -287,7 +289,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
         }
 
-        private void Discover(
+        private LeavingSoonDiagnostics Discover(
             LeavingSoonState state,
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
@@ -298,6 +300,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             TimeSpan minAge,
             DateTime now)
         {
+            var diag = new LeavingSoonDiagnostics
+            {
+                EligibleProfileCount = eligibleProfiles.Count,
+                SafeCollectionCount = safeCollections.Count
+            };
+
             var scoredMovies = new List<(string Id, float Score)>();
             var scoredTv = new List<(string Id, float Score)>();
 
@@ -307,21 +315,25 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 if (state.RemovalCandidates.ContainsKey(id))
                 {
+                    diag.SkippedAlreadyRemoval++;
                     continue;
                 }
 
                 if (meta.Genres.Count == 0 && meta.Actors.Count == 0)
                 {
+                    diag.SkippedNoMetadata++;
                     continue;
                 }
 
                 if (!string.IsNullOrWhiteSpace(meta.CollectionName) && safeCollections.Contains(meta.CollectionName))
                 {
+                    diag.SkippedSafeCollection++;
                     continue;
                 }
 
                 if (!embeddings.TryGetValue(meta.Id, out var embedding))
                 {
+                    diag.SkippedNoEmbedding++;
                     continue;
                 }
 
@@ -330,6 +342,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     var item = _libraryManager.GetItemById(meta.Id);
                     if (item == null)
                     {
+                        diag.SkippedNotFound++;
                         continue;
                     }
 
@@ -346,6 +359,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                     if (alwaysSafe)
                     {
+                        diag.SkippedAlwaysSafe++;
                         continue;
                     }
 
@@ -368,6 +382,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                     if (effectiveAge < minAge)
                     {
+                        diag.SkippedTooYoung++;
                         continue;
                     }
                 }
@@ -384,10 +399,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 if (meta.Type == MediaType.Movie)
                 {
+                    diag.ScoredMovies++;
                     scoredMovies.Add((id, maxSimilarity));
                 }
                 else if (meta.Type == MediaType.Series)
                 {
+                    diag.ScoredTv++;
                     scoredTv.Add((id, maxSimilarity));
                 }
             }
@@ -434,6 +451,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 flagged,
                 evicted.Count,
                 state.FlaggedItems.Count);
+
+            return diag;
         }
 
         private bool IsItemSafeForUser(BaseItem item, User user)
@@ -444,42 +463,25 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 return false;
             }
 
-            if (userData.Played || userData.IsFavorite || userData.PlaybackPositionTicks > 0)
-            {
-                return true;
-            }
-
-            if (item is Series series)
-            {
-                return HasAnyWatchedEpisode(series, user);
-            }
-
-            return false;
-        }
-
-        private bool HasAnyWatchedEpisode(Series series, User user)
-        {
-            var episodes = _libraryManager.GetItemList(new InternalItemsQuery
-            {
-                ParentId = series.Id,
-                IncludeItemTypes = new[] { BaseItemKind.Episode },
-                Recursive = true
-            });
-
-            foreach (var ep in episodes)
-            {
-                var epData = _userDataManager.GetUserData(user, ep);
-                if (epData != null && (epData.Played || epData.PlaybackPositionTicks > 0))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return userData.IsFavorite || userData.PlaybackPositionTicks > 0;
         }
 
         private DateTime? GetLastWatchDate(BaseItem item, User user)
         {
+            if (item is Series series)
+            {
+                var episodes = _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    ParentId = series.Id,
+                    IncludeItemTypes = new[] { BaseItemKind.Episode },
+                    Recursive = true,
+                    OrderBy = new[] { (Jellyfin.Data.Enums.ItemSortBy.DatePlayed, Jellyfin.Data.Enums.SortOrder.Descending) },
+                    Limit = 1
+                });
+                var lastEpisode = episodes.FirstOrDefault();
+                return lastEpisode != null ? _userDataManager.GetUserData(user, lastEpisode)?.LastPlayedDate : null;
+            }
+
             return _userDataManager.GetUserData(user, item)?.LastPlayedDate;
         }
 
