@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.0.10",
-        "changelog": "Replace rewatch boost with Recent Watch Boost\n- Remove PlayCount-based rewatch boost (unreliable due to Jellyfin stop-start inflation)\n- Add Recent Watch Boost: weight = decay × (1 + recentWatchBoost × decay) × favoriteBoost\n- Just-watched items get 2× their decay weight by default (recentWatchBoost=1.0)\n- Boost fades naturally using the existing recency half-life — no hard window cutoff\n- Rewatches implicitly rewarded: re-watching resets LastPlayedDate to today, giving full boost automatically\n- Optimize TV series date query: single OrderBy DatePlayed descending query instead of full episode scan",
+        "changelog": "Replace rewatch boost with Recent Watch Boost\n- Remove PlayCount-based rewatch boost (unreliable due to Jellyfin stop-start inflation)\n- Add Recent Watch Boost: weight = decay \u00d7 (1 + recentWatchBoost \u00d7 decay) \u00d7 favoriteBoost\n- Just-watched items get 2\u00d7 their decay weight by default (recentWatchBoost=1.0)\n- Boost fades naturally using the existing recency half-life \u2014 no hard window cutoff\n- Rewatches implicitly rewarded: re-watching resets LastPlayedDate to today, giving full boost automatically\n- Optimize TV series date query: single OrderBy DatePlayed descending query instead of full episode scan",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.10/jellyfin-plugin-localrecs-v0.6.0.10.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "6a75d13208801967495de95ce451acef",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
