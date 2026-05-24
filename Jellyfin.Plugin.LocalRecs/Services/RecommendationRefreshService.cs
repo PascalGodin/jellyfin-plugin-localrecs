@@ -24,6 +24,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         private readonly UserProfileService _userProfileService;
         private readonly RecommendationEngine _recommendationEngine;
         private readonly DiagnosticLogService _diagnosticLogService;
+        private readonly LeavingSoonService _leavingSoonService;
         private readonly IUserManager _userManager;
 
         /// <summary>
@@ -36,6 +37,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="userProfileService">User profile service.</param>
         /// <param name="recommendationEngine">Recommendation engine.</param>
         /// <param name="diagnosticLogService">Diagnostic log service.</param>
+        /// <param name="leavingSoonService">Leaving Soon scoring service.</param>
         /// <param name="userManager">User manager for resolving usernames.</param>
         public RecommendationRefreshService(
             ILogger<RecommendationRefreshService> logger,
@@ -45,6 +47,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             UserProfileService userProfileService,
             RecommendationEngine recommendationEngine,
             DiagnosticLogService diagnosticLogService,
+            LeavingSoonService leavingSoonService,
             IUserManager userManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -54,6 +57,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _userProfileService = userProfileService ?? throw new ArgumentNullException(nameof(userProfileService));
             _recommendationEngine = recommendationEngine ?? throw new ArgumentNullException(nameof(recommendationEngine));
             _diagnosticLogService = diagnosticLogService ?? throw new ArgumentNullException(nameof(diagnosticLogService));
+            _leavingSoonService = leavingSoonService ?? throw new ArgumentNullException(nameof(leavingSoonService));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
         }
 
@@ -195,9 +199,26 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             _logger.LogInformation("Successfully generated recommendations for {Count}/{Total} users", results.Count, userIds.Count);
 
+            // Run Leaving Soon scoring using the profiles already computed above
+            LeavingSoonState? leavingSoonState = null;
+            if (config.LeavingSoonEnabled)
+            {
+                var eligibleProfiles = userLogEntries
+                    .Where(e => e.WarmStart && e.Profile != null)
+                    .Select(e => e.Profile!)
+                    .ToList();
+
+                leavingSoonState = _leavingSoonService.Refresh(
+                    metadata.Values.ToList(),
+                    embeddings,
+                    eligibleProfiles,
+                    config,
+                    System.Threading.CancellationToken.None);
+            }
+
             if (config.EnableDiagnosticLog)
             {
-                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, config, libraryScan, vocabularyBuild, embeddingCompute);
+                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, config, libraryScan, vocabularyBuild, embeddingCompute);
             }
 
             return Task.FromResult(results);
@@ -417,6 +438,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions,
                 ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist,
                 TimeSpan UserDuration)> userEntries,
+            LeavingSoonState? leavingSoonState,
             PluginConfiguration config,
             TimeSpan libraryScan,
             TimeSpan vocabularyBuild,
@@ -583,6 +605,64 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 AppendRecommendationList(sb, "Movies", movies, metadata, warmStart, profile, embeddings, vocabulary);
                 AppendRecommendationList(sb, "TV Shows", tv, metadata, warmStart, profile, embeddings, vocabulary);
+            }
+
+            // LEAVING SOON
+            if (leavingSoonState != null)
+            {
+                sb.AppendLine(dash);
+                sb.AppendLine("LEAVING SOON");
+                sb.AppendLine();
+
+                var now = DateTime.UtcNow;
+
+                if (leavingSoonState.FlaggedItems.Count == 0)
+                {
+                    sb.AppendLine("  Flagged (0)");
+                }
+                else
+                {
+                    sb.AppendLine($"  Flagged ({leavingSoonState.FlaggedItems.Count}):");
+                    var flaggedOrdered = leavingSoonState.FlaggedItems
+                        .OrderByDescending(kvp => kvp.Value)
+                        .ToList();
+                    for (var i = 0; i < flaggedOrdered.Count; i++)
+                    {
+                        var (id, flaggedAt) = (flaggedOrdered[i].Key, flaggedOrdered[i].Value);
+                        var idGuid = Guid.TryParse(id, out var g) ? g : Guid.Empty;
+                        metadata.TryGetValue(idGuid, out var meta);
+                        var name = meta?.Name ?? id;
+                        var year = meta?.ReleaseYear > 0 ? $" ({meta.ReleaseYear})" : string.Empty;
+                        var daysAgo = (now - flaggedAt).TotalDays;
+                        sb.AppendLine($"    {i + 1,3}.  {name}{year}  [flagged {daysAgo:F0}d ago]");
+                    }
+                }
+
+                sb.AppendLine();
+
+                if (leavingSoonState.RemovalCandidates.Count == 0)
+                {
+                    sb.AppendLine("  Removal candidates (0)");
+                }
+                else
+                {
+                    sb.AppendLine($"  Removal candidates ({leavingSoonState.RemovalCandidates.Count}):");
+                    var removalOrdered = leavingSoonState.RemovalCandidates
+                        .OrderByDescending(kvp => kvp.Value)
+                        .ToList();
+                    for (var i = 0; i < removalOrdered.Count; i++)
+                    {
+                        var (id, promotedAt) = (removalOrdered[i].Key, removalOrdered[i].Value);
+                        var idGuid = Guid.TryParse(id, out var g) ? g : Guid.Empty;
+                        metadata.TryGetValue(idGuid, out var meta);
+                        var name = meta?.Name ?? id;
+                        var year = meta?.ReleaseYear > 0 ? $" ({meta.ReleaseYear})" : string.Empty;
+                        var daysInRemoval = (now - promotedAt).TotalDays;
+                        sb.AppendLine($"    {i + 1,3}.  {name}{year}  [in removal {daysInRemoval:F0}d]");
+                    }
+                }
+
+                sb.AppendLine();
             }
 
             sb.AppendLine(line);

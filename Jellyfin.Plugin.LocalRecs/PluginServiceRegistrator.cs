@@ -38,6 +38,19 @@ namespace Jellyfin.Plugin.LocalRecs
             // Phase 6: Recommendation Refresh Service
             serviceCollection.AddSingleton<RecommendationRefreshService>();
 
+            // Leaving Soon scoring (diagnostic log output only — no virtual library yet)
+            serviceCollection.AddSingleton(sp =>
+            {
+                var appPaths = sp.GetRequiredService<IApplicationPaths>();
+                var pluginDataPath = Path.Combine(appPaths.PluginsPath, "LocalRecs");
+                return new LeavingSoonService(
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LeavingSoonService>>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserManager>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserDataManager>(),
+                    sp.GetRequiredService<MediaBrowser.Controller.Library.ILibraryManager>(),
+                    pluginDataPath);
+            });
+
             // Phase 7: Virtual Library Services
             // Use lazy initialization to ensure Plugin.Instance is available
             serviceCollection.AddSingleton(sp =>
