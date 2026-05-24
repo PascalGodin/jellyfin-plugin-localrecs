@@ -187,35 +187,28 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         }
 
         /// <summary>
-        /// Returns the most recent LastPlayedDate across all watched episodes of a series,
+        /// Returns the most recent LastPlayedDate across watched episodes of a series,
         /// or null if no episodes have been watched.
         /// </summary>
         private DateTime? GetLastWatchedEpisodeDate(Series series, Jellyfin.Database.Implementations.Entities.User user)
         {
-            var watchedEpisodes = _libraryManager.GetItemList(new InternalItemsQuery(user)
+            var result = _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 IncludeItemTypes = new[] { BaseItemKind.Episode },
                 AncestorIds = new[] { series.Id },
                 IsPlayed = true,
-                Recursive = true
+                Recursive = true,
+                OrderBy = new[] { (ItemSortBy.DatePlayed, Jellyfin.Database.Implementations.Enums.SortOrder.Descending) },
+                Limit = 1
             });
 
-            if (watchedEpisodes.Count == 0)
+            if (result.Count == 0)
             {
                 return null;
             }
 
-            DateTime? latest = null;
-            foreach (var episode in watchedEpisodes)
-            {
-                var epData = _userDataManager.GetUserData(user, episode);
-                if (epData?.LastPlayedDate != null && (latest == null || epData.LastPlayedDate.Value > latest.Value))
-                {
-                    latest = epData.LastPlayedDate.Value;
-                }
-            }
-
-            return latest ?? DateTime.UtcNow;
+            var epData = _userDataManager.GetUserData(user, result[0]);
+            return epData?.LastPlayedDate ?? DateTime.UtcNow;
         }
 
         /// <summary>
