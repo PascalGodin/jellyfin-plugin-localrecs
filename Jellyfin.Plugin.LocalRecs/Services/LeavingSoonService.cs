@@ -89,20 +89,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger.LogInformation("Starting Leaving Soon refresh");
 
             var state = LoadState();
-            var allItemsById = BuildItemIndex(allItems);
 
             var now = DateTime.UtcNow;
             var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
 
-            // Pass 1: Remove deleted, favorited, or too-young items from state
-            Cleanup(state, allItemsById, watchStatus, minAge, now);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Pass 2: Promote items that have exceeded the dwell period
+            // Pass 1: Promote items that have exceeded the dwell period
             Promote(state, config);
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Pass 3: Discover new candidates using pre-computed embeddings and profiles
+            // Pass 2: Discover new candidates and reconcile FlaggedItems
             LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
             {
@@ -124,80 +119,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 state.RemovalCandidates.Count);
 
             return (state, diagnostics);
-        }
-
-        private static Dictionary<string, MediaItemMetadata> BuildItemIndex(IReadOnlyList<MediaItemMetadata> allItems)
-        {
-            var index = new Dictionary<string, MediaItemMetadata>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in allItems)
-            {
-                index[item.Id.ToString()] = item;
-            }
-
-            return index;
-        }
-
-        private void Cleanup(
-            LeavingSoonState state,
-            Dictionary<string, MediaItemMetadata> allItemsById,
-            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
-            TimeSpan minAge,
-            DateTime now)
-        {
-            var toRemove = new List<string>();
-            var allStateIds = state.FlaggedItems.Keys.Concat(state.RemovalCandidates.Keys).Distinct().ToList();
-
-            foreach (var id in allStateIds)
-            {
-                if (!allItemsById.TryGetValue(id, out var meta))
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
-                if (meta.Genres.Count == 0 && meta.Actors.Count == 0)
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
-                watchStatus.TryGetValue(meta.Id, out var ws);
-
-                if (ws.IsAnyFavorite)
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
-                var item = _libraryManager.GetItemById(meta.Id);
-                if (item == null)
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
-                var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
-                var timeSinceAdded = now - addedDate;
-                var effectiveAge = ws.LatestWatchDate.HasValue
-                    ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
-                    : timeSinceAdded;
-
-                if (effectiveAge < minAge)
-                {
-                    toRemove.Add(id);
-                }
-            }
-
-            foreach (var id in toRemove)
-            {
-                state.FlaggedItems.Remove(id);
-                state.RemovalCandidates.Remove(id);
-            }
-
-            if (toRemove.Count > 0)
-            {
-                _logger.LogDebug("Leaving Soon cleanup: removed {Count} items from state", toRemove.Count);
-            }
         }
 
         private void Promote(LeavingSoonState state, PluginConfiguration config)
@@ -235,7 +156,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             };
 
             // Score all eligible items, tracking days until age-eligible for worst-X candidates.
-            // Already-flagged items are guaranteed age-eligible (Cleanup evicted any that aren't).
+            // Previously-flagged items use watch-date alone to avoid a redundant GetItemById call.
             var scoredMovies = new List<(string Id, float Score, double DaysUntilEligible)>();
             var scoredTv = new List<(string Id, float Score, double DaysUntilEligible)>();
 
@@ -272,7 +193,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 double daysUntilEligible;
                 if (state.FlaggedItems.ContainsKey(id))
                 {
-                    daysUntilEligible = 0; // survived Cleanup, guaranteed old enough
+                    var timeSinceWatch = ws.LatestWatchDate.HasValue ? (now - ws.LatestWatchDate.Value) : TimeSpan.MaxValue;
+                    daysUntilEligible = timeSinceWatch >= minAge ? 0 : (minAge - timeSinceWatch).TotalDays;
                 }
                 else
                 {
@@ -334,12 +256,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var targetTv = topTv.Where(x => x.DaysUntilEligible == 0).Select(x => x.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var scoredIds = new HashSet<string>(
-                scoredMovies.Select(x => x.Id).Concat(scoredTv.Select(x => x.Id)),
-                StringComparer.OrdinalIgnoreCase);
-
             var evicted = state.FlaggedItems.Keys
-                .Where(id => scoredIds.Contains(id) && !targetMovies.Contains(id) && !targetTv.Contains(id))
+                .Where(id => !targetMovies.Contains(id) && !targetTv.Contains(id))
                 .ToList();
 
             foreach (var id in evicted)
