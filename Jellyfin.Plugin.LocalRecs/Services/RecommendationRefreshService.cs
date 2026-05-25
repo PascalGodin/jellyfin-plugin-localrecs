@@ -649,6 +649,20 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     sb.AppendLine($"      Favorited/active : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
                     sb.AppendLine($"      Too young (<{config.LeavingSoonMinAgeDays}d): {leavingSoonDiagnostics.SkippedTooYoung}");
                     sb.AppendLine($"      Not found        : {leavingSoonDiagnostics.SkippedNotFound}");
+                    sb.AppendLine($"      Unknown type     : {leavingSoonDiagnostics.SkippedUnknownType}");
+
+                    if (leavingSoonDiagnostics.TooYoungItems.Count > 0)
+                    {
+                        sb.AppendLine($"    Too young details ({leavingSoonDiagnostics.TooYoungItems.Count}):");
+                        foreach (var (itemId, daysLeft) in leavingSoonDiagnostics.TooYoungItems)
+                        {
+                            metadata.TryGetValue(itemId, out var tyMeta);
+                            var tyName = tyMeta?.Name ?? itemId.ToString();
+                            var tyYear = tyMeta?.ReleaseYear > 0 ? $" ({tyMeta.ReleaseYear})" : string.Empty;
+                            sb.AppendLine($"      - {tyName}{tyYear}  [{daysLeft:F0}d until eligible]");
+                        }
+                    }
+
                     sb.AppendLine();
                 }
 

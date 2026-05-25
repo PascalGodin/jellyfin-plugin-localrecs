@@ -234,10 +234,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 EligibleProfileCount = eligibleProfiles.Count
             };
 
-            // Score all eligible items, recording whether each one is old enough.
+            // Score all eligible items, tracking days until age-eligible for worst-X candidates.
             // Already-flagged items are guaranteed age-eligible (Cleanup evicted any that aren't).
-            var scoredMovies = new List<(string Id, float Score, bool AgeOk)>();
-            var scoredTv = new List<(string Id, float Score, bool AgeOk)>();
+            var scoredMovies = new List<(string Id, float Score, double DaysUntilEligible)>();
+            var scoredTv = new List<(string Id, float Score, double DaysUntilEligible)>();
 
             foreach (var meta in allItems)
             {
@@ -269,10 +269,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                bool ageOk;
+                double daysUntilEligible;
                 if (state.FlaggedItems.ContainsKey(id))
                 {
-                    ageOk = true; // survived Cleanup, guaranteed old enough
+                    daysUntilEligible = 0; // survived Cleanup, guaranteed old enough
                 }
                 else
                 {
@@ -288,7 +288,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     var effectiveAge = ws.LatestWatchDate.HasValue
                         ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
                         : timeSinceAdded;
-                    ageOk = effectiveAge >= minAge;
+                    daysUntilEligible = effectiveAge >= minAge ? 0 : (minAge - effectiveAge).TotalDays;
                 }
 
                 var maxSimilarity = 0f;
@@ -304,12 +304,16 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 if (meta.Type == MediaType.Movie)
                 {
                     diag.ScoredMovies++;
-                    scoredMovies.Add((id, maxSimilarity, ageOk));
+                    scoredMovies.Add((id, maxSimilarity, daysUntilEligible));
                 }
                 else if (meta.Type == MediaType.Series)
                 {
                     diag.ScoredTv++;
-                    scoredTv.Add((id, maxSimilarity, ageOk));
+                    scoredTv.Add((id, maxSimilarity, daysUntilEligible));
+                }
+                else
+                {
+                    diag.SkippedUnknownType++;
                 }
             }
 
@@ -317,11 +321,17 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var topMovies = scoredMovies.OrderBy(x => x.Score).Take(config.LeavingSoonMovieCount).ToList();
             var topTv = scoredTv.OrderBy(x => x.Score).Take(config.LeavingSoonTvCount).ToList();
 
-            diag.SkippedTooYoung = topMovies.Count(x => !x.AgeOk) + topTv.Count(x => !x.AgeOk);
+            diag.SkippedTooYoung = topMovies.Count(x => x.DaysUntilEligible > 0) + topTv.Count(x => x.DaysUntilEligible > 0);
 
-            var targetMovies = topMovies.Where(x => x.AgeOk).Select(x => x.Id)
+            foreach (var item in topMovies.Concat(topTv).Where(x => x.DaysUntilEligible > 0))
+            {
+                var itemId = Guid.TryParse(item.Id, out var g) ? g : Guid.Empty;
+                diag.TooYoungItems.Add((itemId, item.DaysUntilEligible));
+            }
+
+            var targetMovies = topMovies.Where(x => x.DaysUntilEligible == 0).Select(x => x.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var targetTv = topTv.Where(x => x.AgeOk).Select(x => x.Id)
+            var targetTv = topTv.Where(x => x.DaysUntilEligible == 0).Select(x => x.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var scoredIds = new HashSet<string>(

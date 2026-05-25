@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Jellyfin.Plugin.LocalRecs.Models
 {
     /// <summary>
@@ -20,11 +23,17 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         /// <summary>Gets or sets items skipped because they are favorited or currently in-progress by any user.</summary>
         public int SkippedAlwaysSafe { get; set; }
 
-        /// <summary>Gets or sets items skipped because they do not meet the minimum age requirement.</summary>
+        /// <summary>Gets or sets the count of worst-X candidates that failed the age gate.</summary>
         public int SkippedTooYoung { get; set; }
+
+        /// <summary>Gets the worst-X candidates that failed the age gate, with days remaining until eligible.</summary>
+        public List<(Guid ItemId, double DaysUntilEligible)> TooYoungItems { get; } = new List<(Guid ItemId, double DaysUntilEligible)>();
 
         /// <summary>Gets or sets items skipped because the item could not be found in the library.</summary>
         public int SkippedNotFound { get; set; }
+
+        /// <summary>Gets or sets items that passed all checks but had an unrecognized media type (neither Movie nor Series).</summary>
+        public int SkippedUnknownType { get; set; }
 
         /// <summary>Gets or sets the number of movie candidates that were scored.</summary>
         public int ScoredMovies { get; set; }
