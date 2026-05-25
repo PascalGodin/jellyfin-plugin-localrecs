@@ -12,7 +12,7 @@
         "changelog": "Leaving Soon diagnostics: too-young item details and unknown-type counter\n- Worst-X candidates excluded by the age gate are now listed in the diagnostic log with days remaining until eligible\n- Unknown media type counter added (items that pass all checks but are neither Movie nor Series) to explain library count gaps between the library total and scored totals",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.17/jellyfin-plugin-localrecs-v0.6.0.17.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "cc800f29d0cc802cfd74439c78fb42af",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
