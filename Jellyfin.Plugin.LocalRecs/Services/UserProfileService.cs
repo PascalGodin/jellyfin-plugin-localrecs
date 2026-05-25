@@ -48,10 +48,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="userId">The user identifier.</param>
         /// <param name="embeddings">Dictionary of item embeddings.</param>
         /// <param name="config">Plugin configuration.</param>
-        /// <returns>UserProfile with taste vector, or null if user has no watch history.</returns>
+        /// <returns>UserProfile with taste vector (or null if no watch history), and the raw watch records used to build it.</returns>
         /// <exception cref="ArgumentNullException">Thrown when embeddings or config is null.</exception>
         /// <exception cref="ArgumentException">Thrown when embeddings dictionary is empty.</exception>
-        public UserProfile? BuildUserProfile(
+        public (UserProfile? Profile, IReadOnlyList<WatchRecord> WatchRecords) BuildUserProfile(
             Guid userId,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             PluginConfiguration config)
@@ -79,7 +79,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             if (watchRecords.Count == 0)
             {
                 _logger.LogWarning("No watch history found for user {UserId}", userId);
-                return null; // Return null to trigger cold-start recommendations
+                return (null, Array.Empty<WatchRecord>());
             }
 
             _logger.LogDebug("Found {Count} watched items for user {UserId}", watchRecords.Count, userId);
@@ -110,7 +110,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 avgCommunity ?? 0,
                 avgCritic ?? 0);
 
-            return profile;
+            return (profile, watchRecords);
         }
 
         /// <summary>

@@ -78,7 +78,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Generate recommendations (real service, mocked Jellyfin)
             var engine = new RecommendationEngine(
@@ -132,7 +132,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             var engine = new RecommendationEngine(
                 _mockUserDataManager.Object,
@@ -184,7 +184,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             var engine = new RecommendationEngine(
                 _mockUserDataManager.Object,
@@ -235,7 +235,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             var engine = new RecommendationEngine(
                 _mockUserDataManager.Object,
@@ -292,7 +292,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
             var vocabulary = vocabBuilder.BuildVocabulary(library);
             var embeddings = embeddingService.ComputeEmbeddings(library, vocabulary);
             var metadata = library.ToDictionary(i => i.Id, i => i);
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
             var recommendations = engine.GenerateRecommendations(
                 _testUserId, userProfile, embeddings, metadata, _config);
 
@@ -373,7 +373,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 NullLogger<RecommendationEngine>.Instance);
 
             // Act - Build profile (should return null for no watch history)
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert - Profile should be null
             userProfile.Should().BeNull("user has no watch history");
@@ -444,7 +444,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             var engine = new RecommendationEngine(
                 _mockUserDataManager.Object,
@@ -503,7 +503,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 _mockLibraryManager.Object,
                 NullLogger<UserProfileService>.Instance);
 
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, _config);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, _config);
 
             var engine = new RecommendationEngine(
                 _mockUserDataManager.Object,
@@ -593,7 +593,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 NullLogger<RecommendationEngine>.Instance);
 
             // Act & Assert - Should handle gracefully
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, configWithSmallHalfLife);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, configWithSmallHalfLife);
             var recommendations = engine.GenerateRecommendations(
                 _testUserId, userProfile, embeddings, metadata, configWithSmallHalfLife);
 
@@ -640,7 +640,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 NullLogger<RecommendationEngine>.Instance);
 
             // Act & Assert
-            var userProfile = profileService.BuildUserProfile(_testUserId, embeddings, configWithExtremeBoosts);
+            var (userProfile, _) = profileService.BuildUserProfile(_testUserId, embeddings, configWithExtremeBoosts);
             var recommendations = engine.GenerateRecommendations(
                 _testUserId, userProfile, embeddings, metadata, configWithExtremeBoosts);
 

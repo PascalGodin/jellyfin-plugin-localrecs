@@ -192,7 +192,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                         cancellationToken.ThrowIfCancellationRequested();
 
                         var profileStopwatch = Stopwatch.StartNew();
-                        var profile = _userProfileService.BuildUserProfile(user.Id, embeddingsDict, config);
+                        var (profile, _) = _userProfileService.BuildUserProfile(user.Id, embeddingsDict, config);
                         profileStopwatch.Stop();
 
                         if (profile != null)
@@ -240,7 +240,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
 
                 foreach (var user in users)
                 {
-                    testProfile = _userProfileService.BuildUserProfile(user.Id, embeddingsDict, config);
+                    (testProfile, _) = _userProfileService.BuildUserProfile(user.Id, embeddingsDict, config);
                     if (testProfile != null)
                     {
                         testUserId = user.Id;

@@ -65,7 +65,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             SetupUserDataMocks(library.Take(3).ToList());
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().NotBeNull();
@@ -86,7 +86,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             SetupUserDataMocks(library.Take(5).ToList());
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().NotBeNull();
@@ -110,7 +110,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             SetupSpecificUserData(inception, isFavorite: false, playCount: 1, daysAgo: 7);
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().NotBeNull();
@@ -145,7 +145,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             SetupSpecificUserData(old, isFavorite: false, playCount: 1, daysAgo: 365);
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().NotBeNull();
@@ -176,7 +176,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             // No user data setup - empty watch history
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().BeNull();
@@ -237,7 +237,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             _mockUserManager.Setup(m => m.GetUserById(unknownUserId)).Returns((User?)null);
 
             // Act
-            var profile = _service.BuildUserProfile(unknownUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(unknownUserId, embeddings, _config);
 
             // Assert
             profile.Should().BeNull("user not found means no watch history");
@@ -271,7 +271,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             }
 
             // Act
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
 
             // Assert
             profile.Should().NotBeNull();
@@ -289,7 +289,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
 
             // Act
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var profile = _service.BuildUserProfile(_testUserId, embeddings, _config);
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
             stopwatch.Stop();
 
             // Assert

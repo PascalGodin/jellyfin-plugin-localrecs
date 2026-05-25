@@ -45,8 +45,6 @@ namespace Jellyfin.Plugin.LocalRecs
                 var pluginDataPath = Path.Combine(appPaths.PluginsPath, "LocalRecs");
                 return new LeavingSoonService(
                     sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LeavingSoonService>>(),
-                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserManager>(),
-                    sp.GetRequiredService<MediaBrowser.Controller.Library.IUserDataManager>(),
                     sp.GetRequiredService<MediaBrowser.Controller.Library.ILibraryManager>(),
                     pluginDataPath);
             });

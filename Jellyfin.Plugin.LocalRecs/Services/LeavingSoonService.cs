@@ -4,15 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
-using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.LocalRecs.Configuration;
 using Jellyfin.Plugin.LocalRecs.Models;
 using Jellyfin.Plugin.LocalRecs.Utilities;
 using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
-using BaseItemKind = Jellyfin.Data.Enums.BaseItemKind;
 
 namespace Jellyfin.Plugin.LocalRecs.Services
 {
@@ -25,8 +22,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
     public class LeavingSoonService
     {
         private readonly ILogger<LeavingSoonService> _logger;
-        private readonly IUserManager _userManager;
-        private readonly IUserDataManager _userDataManager;
         private readonly ILibraryManager _libraryManager;
         private readonly string _stateFilePath;
 
@@ -34,20 +29,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// Initializes a new instance of the <see cref="LeavingSoonService"/> class.
         /// </summary>
         /// <param name="logger">Logger instance.</param>
-        /// <param name="userManager">User manager.</param>
-        /// <param name="userDataManager">User data manager.</param>
         /// <param name="libraryManager">Library manager.</param>
         /// <param name="pluginDataPath">Plugin data directory path.</param>
         public LeavingSoonService(
             ILogger<LeavingSoonService> logger,
-            IUserManager userManager,
-            IUserDataManager userDataManager,
             ILibraryManager libraryManager,
             string pluginDataPath)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
-            _userDataManager = userDataManager ?? throw new ArgumentNullException(nameof(userDataManager));
             _libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
             _stateFilePath = Path.Combine(
                 pluginDataPath ?? throw new ArgumentNullException(nameof(pluginDataPath)),
@@ -60,6 +49,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="allItems">All media items in the library.</param>
         /// <param name="embeddings">Pre-computed item embeddings.</param>
         /// <param name="eligibleProfiles">Pre-computed taste profiles for users with enough watch history.</param>
+        /// <param name="watchStatus">Aggregated watch status across all users, keyed by item ID.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Updated Leaving Soon state and discovery diagnostics after this run.</returns>
@@ -67,6 +57,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
             PluginConfiguration config,
             CancellationToken cancellationToken)
         {
@@ -85,6 +76,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 throw new ArgumentNullException(nameof(eligibleProfiles));
             }
 
+            if (watchStatus == null)
+            {
+                throw new ArgumentNullException(nameof(watchStatus));
+            }
+
             if (config == null)
             {
                 throw new ArgumentNullException(nameof(config));
@@ -93,15 +89,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger.LogInformation("Starting Leaving Soon refresh");
 
             var state = LoadState();
-            var users = _userManager.GetUsers().ToList();
             var allItemsById = BuildItemIndex(allItems);
 
             var now = DateTime.UtcNow;
             var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
 
             // Pass 1: Remove saved, deleted, or collection-protected items
-            var safeCollections = BuildSafeCollections(allItems, users);
-            Cleanup(state, allItemsById, users, safeCollections, minAge, now);
+            var safeCollections = BuildSafeCollections(allItems, watchStatus);
+            Cleanup(state, allItemsById, safeCollections, watchStatus, minAge, now);
             cancellationToken.ThrowIfCancellationRequested();
 
             // Pass 2: Promote items that have exceeded the dwell period
@@ -112,7 +107,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
             {
-                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, users, config, minAge, now);
+                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, watchStatus, config, minAge, now);
             }
             else
             {
@@ -145,7 +140,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         private HashSet<string> BuildSafeCollections(
             IReadOnlyList<MediaItemMetadata> allItems,
-            IReadOnlyList<User> users)
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus)
         {
             var safe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -161,19 +156,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                var item = _libraryManager.GetItemById(meta.Id);
-                if (item == null)
+                if (watchStatus.TryGetValue(meta.Id, out var ws) && ws.IsAnyFavorite)
                 {
-                    continue;
-                }
-
-                foreach (var user in users)
-                {
-                    if (IsItemSafeForUser(item, user))
-                    {
-                        safe.Add(meta.CollectionName);
-                        break;
-                    }
+                    safe.Add(meta.CollectionName);
                 }
             }
 
@@ -184,8 +169,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         private void Cleanup(
             LeavingSoonState state,
             Dictionary<string, MediaItemMetadata> allItemsById,
-            IReadOnlyList<User> users,
             HashSet<string> safeCollections,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
             TimeSpan minAge,
             DateTime now)
         {
@@ -212,6 +197,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
+                watchStatus.TryGetValue(meta.Id, out var ws);
+
+                if (ws.IsAnyFavorite)
+                {
+                    toRemove.Add(id);
+                    continue;
+                }
+
                 var item = _libraryManager.GetItemById(meta.Id);
                 if (item == null)
                 {
@@ -219,37 +212,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                var alwaysSafe = false;
-                foreach (var user in users)
-                {
-                    var ud = _userDataManager.GetUserData(user, item);
-                    if (ud != null && (ud.IsFavorite || ud.PlaybackPositionTicks > 0))
-                    {
-                        alwaysSafe = true;
-                        break;
-                    }
-                }
-
-                if (alwaysSafe)
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
                 var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
                 var timeSinceAdded = now - addedDate;
-                DateTime? latestWatchDate = null;
-                foreach (var user in users)
-                {
-                    var wd = GetLastWatchDate(item, user);
-                    if (wd.HasValue && (latestWatchDate == null || wd.Value > latestWatchDate.Value))
-                    {
-                        latestWatchDate = wd.Value;
-                    }
-                }
-
-                var effectiveAge = latestWatchDate.HasValue
-                    ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - latestWatchDate.Value).Ticks))
+                var effectiveAge = ws.LatestWatchDate.HasValue
+                    ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
                     : timeSinceAdded;
 
                 if (effectiveAge < minAge)
@@ -295,7 +261,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
             HashSet<string> safeCollections,
-            IReadOnlyList<User> users,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
             PluginConfiguration config,
             TimeSpan minAge,
             DateTime now)
@@ -339,6 +305,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 if (!state.FlaggedItems.ContainsKey(id))
                 {
+                    watchStatus.TryGetValue(meta.Id, out var ws);
+
+                    if (ws.IsAnyFavorite)
+                    {
+                        diag.SkippedAlwaysSafe++;
+                        continue;
+                    }
+
                     var item = _libraryManager.GetItemById(meta.Id);
                     if (item == null)
                     {
@@ -346,38 +320,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         continue;
                     }
 
-                    var alwaysSafe = false;
-                    foreach (var user in users)
-                    {
-                        var ud = _userDataManager.GetUserData(user, item);
-                        if (ud != null && (ud.IsFavorite || ud.PlaybackPositionTicks > 0))
-                        {
-                            alwaysSafe = true;
-                            break;
-                        }
-                    }
-
-                    if (alwaysSafe)
-                    {
-                        diag.SkippedAlwaysSafe++;
-                        continue;
-                    }
-
                     var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
                     var timeSinceAdded = now - addedDate;
-
-                    DateTime? latestWatchDate = null;
-                    foreach (var user in users)
-                    {
-                        var watchDate = GetLastWatchDate(item, user);
-                        if (watchDate.HasValue && (latestWatchDate == null || watchDate.Value > latestWatchDate.Value))
-                        {
-                            latestWatchDate = watchDate.Value;
-                        }
-                    }
-
-                    var effectiveAge = latestWatchDate.HasValue
-                        ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - latestWatchDate.Value).Ticks))
+                    var effectiveAge = ws.LatestWatchDate.HasValue
+                        ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
                         : timeSinceAdded;
 
                     if (effectiveAge < minAge)
@@ -453,36 +399,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 state.FlaggedItems.Count);
 
             return diag;
-        }
-
-        private bool IsItemSafeForUser(BaseItem item, User user)
-        {
-            var userData = _userDataManager.GetUserData(user, item);
-            if (userData == null)
-            {
-                return false;
-            }
-
-            return userData.IsFavorite || userData.PlaybackPositionTicks > 0;
-        }
-
-        private DateTime? GetLastWatchDate(BaseItem item, User user)
-        {
-            if (item is Series series)
-            {
-                var episodes = _libraryManager.GetItemList(new InternalItemsQuery
-                {
-                    ParentId = series.Id,
-                    IncludeItemTypes = new[] { BaseItemKind.Episode },
-                    Recursive = true,
-                    OrderBy = new[] { (Jellyfin.Data.Enums.ItemSortBy.DatePlayed, Jellyfin.Database.Implementations.Enums.SortOrder.Descending) },
-                    Limit = 1
-                });
-                var lastEpisode = episodes.FirstOrDefault();
-                return lastEpisode != null ? _userDataManager.GetUserData(user, lastEpisode)?.LastPlayedDate : null;
-            }
-
-            return _userDataManager.GetUserData(user, item)?.LastPlayedDate;
         }
 
         private LeavingSoonState LoadState()

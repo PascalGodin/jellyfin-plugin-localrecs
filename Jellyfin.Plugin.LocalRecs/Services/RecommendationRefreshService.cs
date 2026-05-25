@@ -101,8 +101,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="embeddings">Pre-computed item embeddings.</param>
         /// <param name="metadata">Item metadata dictionary.</param>
         /// <param name="config">Plugin configuration.</param>
-        /// <returns>Movie and TV recommendations, warm-start flag, watched item count, user profile, exclusion counts, and score distributions.</returns>
-        public (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv, bool WarmStart, int WatchedItemCount, UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions, ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist) GenerateRecommendationsForUser(
+        /// <returns>Movie and TV recommendations, warm-start flag, watched item count, user profile, exclusion counts, score distributions, and watch records.</returns>
+        public (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv, bool WarmStart, int WatchedItemCount, UserProfile? Profile, ExclusionCounts MovieExclusions, ExclusionCounts TvExclusions, ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist, IReadOnlyList<WatchRecord> WatchRecords) GenerateRecommendationsForUser(
             Guid userId,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyDictionary<Guid, MediaItemMetadata> metadata,
@@ -112,7 +112,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             try
             {
-                var profile = _userProfileService.BuildUserProfile(userId, embeddings, config);
+                var (profile, watchRecords) = _userProfileService.BuildUserProfile(userId, embeddings, config);
                 var warmStart = profile != null && profile.WatchedItemCount >= config.MinWatchedItemsForPersonalization;
                 var watchedCount = profile?.WatchedItemCount ?? 0;
 
@@ -144,12 +144,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     movieRecs.Count,
                     tvRecs.Count);
 
-                return (movieRecs, tvRecs, warmStart, watchedCount, profile, movieExclusions, tvExclusions, movieScoreDist, tvScoreDist);
+                return (movieRecs, tvRecs, warmStart, watchedCount, profile, movieExclusions, tvExclusions, movieScoreDist, tvScoreDist, watchRecords);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to generate recommendations for user {UserId}", userId);
-                return (new List<ScoredRecommendation>(), new List<ScoredRecommendation>(), false, 0, null, new ExclusionCounts(), new ExclusionCounts(), new ScoreDistribution(), new ScoreDistribution());
+                return (new List<ScoredRecommendation>(), new List<ScoredRecommendation>(), false, 0, null, new ExclusionCounts(), new ExclusionCounts(), new ScoreDistribution(), new ScoreDistribution(), Array.Empty<WatchRecord>());
             }
         }
 
@@ -184,14 +184,31 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist,
                 TimeSpan UserDuration)>();
 
+            var watchStatus = new Dictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)>();
+
             foreach (var userId in userIds)
             {
                 var userStart = DateTime.UtcNow;
-                var (movies, tv, warmStart, watchedCount, profile, movieExclusions, tvExclusions, movieScoreDist, tvScoreDist) =
+                var (movies, tv, warmStart, watchedCount, profile, movieExclusions, tvExclusions, movieScoreDist, tvScoreDist, watchRecords) =
                     GenerateRecommendationsForUser(userId, embeddings, metadata, config);
                 var userDuration = DateTime.UtcNow - userStart;
 
                 results[userId] = (movies, tv);
+
+                foreach (var record in watchRecords)
+                {
+                    if (watchStatus.TryGetValue(record.ItemId, out var existing))
+                    {
+                        var newLatest = (!existing.LatestWatchDate.HasValue || (record.LastPlayedDate > existing.LatestWatchDate.Value))
+                            ? (DateTime?)record.LastPlayedDate
+                            : existing.LatestWatchDate;
+                        watchStatus[record.ItemId] = (newLatest, existing.IsAnyFavorite || record.IsFavorite);
+                    }
+                    else
+                    {
+                        watchStatus[record.ItemId] = (record.LastPlayedDate, record.IsFavorite);
+                    }
+                }
 
                 var username = _userManager.GetUserById(userId)?.Username ?? userId.ToString();
                 userLogEntries.Add((username, warmStart, watchedCount, movies, tv, profile, movieExclusions, tvExclusions, movieScoreDist, tvScoreDist, userDuration));
@@ -213,6 +230,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     metadata.Values.ToList(),
                     embeddings,
                     eligibleProfiles,
+                    watchStatus,
                     config,
                     System.Threading.CancellationToken.None);
                 leavingSoonState = lsResult.State;
