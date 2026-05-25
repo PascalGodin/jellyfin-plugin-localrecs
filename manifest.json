@@ -12,7 +12,7 @@
         "changelog": "Pool watch data for Leaving Soon to eliminate redundant DB queries\n- UserProfileService.BuildUserProfile now returns watch records alongside the profile\n- RecommendationRefreshService aggregates per-user watch records into a watchStatus dict (latest watch date + any-favorite flag per item) as the per-user recs loop runs\n- LeavingSoonService.Refresh accepts this pooled watchStatus instead of re-querying all users per item\n- Removes IUserManager and IUserDataManager from LeavingSoonService; library queries for item age still use ILibraryManager\n- Collection protection and alwaysSafe checks now use pooled favorites flag; age calc uses pooled latest watch date\n- Net result: zero additional DB queries during the Leaving Soon pass",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.14/jellyfin-plugin-localrecs-v0.6.0.14.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "bf9189362192a6ab12a060a69dfd6d39",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
