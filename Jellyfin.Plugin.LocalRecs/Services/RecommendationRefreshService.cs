@@ -639,14 +639,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 if (leavingSoonDiagnostics != null)
                 {
                     sb.AppendLine($"  Profiles used     : {leavingSoonDiagnostics.EligibleProfileCount}");
-                    sb.AppendLine($"  Safe collections  : {leavingSoonDiagnostics.SafeCollectionCount}");
                     sb.AppendLine();
                     sb.AppendLine("  Discovery:");
                     sb.AppendLine($"    Scored           : {leavingSoonDiagnostics.ScoredMovies} movies, {leavingSoonDiagnostics.ScoredTv} TV");
                     sb.AppendLine($"    Skipped:");
                     sb.AppendLine($"      Already removal  : {leavingSoonDiagnostics.SkippedAlreadyRemoval}");
                     sb.AppendLine($"      No metadata      : {leavingSoonDiagnostics.SkippedNoMetadata}");
-                    sb.AppendLine($"      Safe collection  : {leavingSoonDiagnostics.SkippedSafeCollection}");
                     sb.AppendLine($"      No embedding     : {leavingSoonDiagnostics.SkippedNoEmbedding}");
                     sb.AppendLine($"      Favorited/active : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
                     sb.AppendLine($"      Too young (<{config.LeavingSoonMinAgeDays}d): {leavingSoonDiagnostics.SkippedTooYoung}");

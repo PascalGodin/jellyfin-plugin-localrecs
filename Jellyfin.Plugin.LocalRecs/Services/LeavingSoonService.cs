@@ -94,9 +94,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var now = DateTime.UtcNow;
             var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
 
-            // Pass 1: Remove saved, deleted, or collection-protected items
-            var safeCollections = BuildSafeCollections(allItems, watchStatus);
-            Cleanup(state, allItemsById, safeCollections, watchStatus, minAge, now);
+            // Pass 1: Remove deleted, favorited, or too-young items from state
+            Cleanup(state, allItemsById, watchStatus, minAge, now);
             cancellationToken.ThrowIfCancellationRequested();
 
             // Pass 2: Promote items that have exceeded the dwell period
@@ -107,7 +106,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
             {
-                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, safeCollections, watchStatus, config, minAge, now);
+                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, watchStatus, config, minAge, now);
             }
             else
             {
@@ -138,38 +137,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             return index;
         }
 
-        private HashSet<string> BuildSafeCollections(
-            IReadOnlyList<MediaItemMetadata> allItems,
-            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus)
-        {
-            var safe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var meta in allItems)
-            {
-                if (string.IsNullOrWhiteSpace(meta.CollectionName))
-                {
-                    continue;
-                }
-
-                if (safe.Contains(meta.CollectionName))
-                {
-                    continue;
-                }
-
-                if (watchStatus.TryGetValue(meta.Id, out var ws) && ws.IsAnyFavorite)
-                {
-                    safe.Add(meta.CollectionName);
-                }
-            }
-
-            _logger.LogDebug("Built safe collection set: {Count} protected collections", safe.Count);
-            return safe;
-        }
-
         private void Cleanup(
             LeavingSoonState state,
             Dictionary<string, MediaItemMetadata> allItemsById,
-            HashSet<string> safeCollections,
             IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
             TimeSpan minAge,
             DateTime now)
@@ -186,12 +156,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
 
                 if (meta.Genres.Count == 0 && meta.Actors.Count == 0)
-                {
-                    toRemove.Add(id);
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(meta.CollectionName) && safeCollections.Contains(meta.CollectionName))
                 {
                     toRemove.Add(id);
                     continue;
@@ -260,7 +224,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
-            HashSet<string> safeCollections,
             IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
             PluginConfiguration config,
             TimeSpan minAge,
@@ -268,8 +231,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         {
             var diag = new LeavingSoonDiagnostics
             {
-                EligibleProfileCount = eligibleProfiles.Count,
-                SafeCollectionCount = safeCollections.Count
+                EligibleProfileCount = eligibleProfiles.Count
             };
 
             var scoredMovies = new List<(string Id, float Score)>();
@@ -288,12 +250,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 if (meta.Genres.Count == 0 && meta.Actors.Count == 0)
                 {
                     diag.SkippedNoMetadata++;
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(meta.CollectionName) && safeCollections.Contains(meta.CollectionName))
-                {
-                    diag.SkippedSafeCollection++;
                     continue;
                 }
 
