@@ -12,7 +12,7 @@
         "changelog": "Remove Leaving Soon collection protection\n- Box-set/collection membership no longer shields items from Leaving Soon candidacy\n- Individual items are still protected if any user has them favorited or in-progress\n- Removes SafeCollectionCount and SkippedSafeCollection from diagnostics",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.15/jellyfin-plugin-localrecs-v0.6.0.15.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "b7027d2cffc8b0c43aec79f5707e4de8",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
