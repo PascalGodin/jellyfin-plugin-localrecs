@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.0.16",
-        "changelog": "Leaving Soon: score-first, age-gate second\n- Previously filtered by age then scored survivors; now scores all eligible items globally, selects the worst X, then age-gates — may produce fewer than X results but every flagged item is both unloved and stale\n- Config page labels updated to 'Max Movie Count' / 'Max TV Count' to reflect that the count is an upper bound\n- SkippedTooYoung now counts items that ranked in the worst-X but were excluded by the age gate",
+        "changelog": "Leaving Soon: score-first, age-gate second\n- Previously filtered by age then scored survivors; now scores all eligible items globally, selects the worst X, then age-gates \u2014 may produce fewer than X results but every flagged item is both unloved and stale\n- Config page labels updated to 'Max Movie Count' / 'Max TV Count' to reflect that the count is an upper bound\n- SkippedTooYoung now counts items that ranked in the worst-X but were excluded by the age gate",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.16/jellyfin-plugin-localrecs-v0.6.0.16.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "1d04b6ade3aa4c358160496e95684d3d",
         "timestamp": "2026-05-24T00:00:00Z"
       },
       {
