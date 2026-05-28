@@ -81,14 +81,14 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
 
                 // Step 2: Generate recommendations for all users (5-80% progress)
                 var userIds = users.Select(u => u.Id).ToList();
-                var userRecommendations = await _refreshService.GenerateRecommendationsForMultipleUsersAsync(
+                var (userRecommendations, leavingSoonState, allItems) = await _refreshService.GenerateRecommendationsForMultipleUsersAsync(
                     userIds,
                     config,
                     startTime).ConfigureAwait(false);
 
                 progress?.Report(80);
 
-                // Step 3: Sync .strm files for each user (80-90% progress)
+                // Step 3: Sync virtual libraries for each user (80-90% progress)
                 cancellationToken.ThrowIfCancellationRequested();
                 var successfulUsers = 0;
                 var failedUsers = new List<string>();
@@ -101,9 +101,8 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                     {
                         if (userRecommendations.TryGetValue(user.Id, out var recs))
                         {
-                            _logger.LogDebug("Syncing .strm files for user {UserName} ({UserId})", user.Username, user.Id);
+                            _logger.LogDebug("Syncing virtual library for user {UserName} ({UserId})", user.Username, user.Id);
 
-                            // Update virtual library files
                             _virtualLibraryManager.SyncRecommendations(
                                 user.Id,
                                 recs.Movies,
@@ -116,7 +115,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
 
                             successfulUsers++;
                             _logger.LogDebug(
-                                "Successfully updated .strm files for {UserName}: {MovieCount} movies, {TvCount} TV shows",
+                                "Successfully updated virtual library for {UserName}: {MovieCount} movies, {TvCount} TV shows",
                                 user.Username,
                                 recs.Movies.Count,
                                 recs.Tv.Count);
@@ -128,9 +127,15 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to sync .strm files for user {UserName} ({UserId})", user.Username, user.Id);
+                        _logger.LogError(ex, "Failed to sync virtual library for user {UserName} ({UserId})", user.Username, user.Id);
                         failedUsers.Add(user.Username);
                     }
+                }
+
+                if (leavingSoonState != null)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    _virtualLibraryManager.SyncLeavingSoon(leavingSoonState, allItems);
                 }
 
                 progress?.Report(90);

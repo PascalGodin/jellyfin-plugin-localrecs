@@ -46,6 +46,18 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             _virtualLibraryBasePath = virtualLibraryBasePath ?? throw new ArgumentNullException(nameof(virtualLibraryBasePath));
         }
 
+        /// <summary>Gets the path for the Leaving Soon Movies shared library.</summary>
+        public string LeavingSoonMoviesPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "movies");
+
+        /// <summary>Gets the path for the Leaving Soon TV shared library.</summary>
+        public string LeavingSoonTvPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "tv");
+
+        /// <summary>Gets the path for the Removal Candidates Movies shared library.</summary>
+        public string RemovalCandidatesMoviesPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "removal-movies");
+
+        /// <summary>Gets the path for the Removal Candidates TV shared library.</summary>
+        public string RemovalCandidatesTvPath => Path.Combine(_virtualLibraryBasePath, "leaving-soon", "removal-tv");
+
         /// <summary>
         /// Gets the virtual library path for a specific user and media type.
         /// </summary>
@@ -151,6 +163,107 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             lock (userLock)
             {
                 return SyncRecommendationsInternal(userId, recommendations, mediaType);
+            }
+        }
+
+        /// <summary>
+        /// Clears and recreates all four Leaving Soon / Removal Candidates shared libraries.
+        /// Uses the same folder-per-item structure as per-user recommendation libraries.
+        /// </summary>
+        /// <param name="state">The current Leaving Soon state.</param>
+        /// <param name="allItems">All media items, used to resolve media type per state entry.</param>
+        public void SyncLeavingSoon(LeavingSoonState state, IReadOnlyList<MediaItemMetadata> allItems)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            if (allItems == null)
+            {
+                throw new ArgumentNullException(nameof(allItems));
+            }
+
+            var metaById = new Dictionary<string, MediaItemMetadata>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in allItems)
+            {
+                metaById[m.Id.ToString()] = m;
+            }
+
+            SyncSharedLibrary(LeavingSoonMoviesPath, FilterIds(state.FlaggedItems, metaById, MediaType.Movie));
+            SyncSharedLibrary(LeavingSoonTvPath, FilterIds(state.FlaggedItems, metaById, MediaType.Series));
+            SyncSharedLibrary(RemovalCandidatesMoviesPath, FilterIds(state.RemovalCandidates, metaById, MediaType.Movie));
+            SyncSharedLibrary(RemovalCandidatesTvPath, FilterIds(state.RemovalCandidates, metaById, MediaType.Series));
+
+            _logger.LogDebug(
+                "Synced Leaving Soon libraries: {FlaggedCount} flagged, {RemovalCount} removal candidates",
+                state.FlaggedItems.Count,
+                state.RemovalCandidates.Count);
+        }
+
+        private static IEnumerable<Guid> FilterIds(
+            Dictionary<string, DateTime> stateDict,
+            Dictionary<string, MediaItemMetadata> metaById,
+            MediaType mediaType)
+        {
+            foreach (var id in stateDict.Keys)
+            {
+                if (metaById.TryGetValue(id, out var meta) && meta.Type == mediaType)
+                {
+                    yield return meta.Id;
+                }
+            }
+        }
+
+        private void SyncSharedLibrary(string libraryPath, IEnumerable<Guid> itemIds)
+        {
+            if (Directory.Exists(libraryPath))
+            {
+                Directory.Delete(libraryPath, recursive: true);
+            }
+
+            Directory.CreateDirectory(libraryPath);
+
+            foreach (var itemId in itemIds)
+            {
+                try
+                {
+                    var item = _libraryManager.GetItemById(itemId);
+                    if (item == null || string.IsNullOrEmpty(item.Path))
+                    {
+                        continue;
+                    }
+
+                    if (item is Series series)
+                    {
+                        CreateSeriesStructure(libraryPath, series);
+                    }
+                    else if (item is Episode || item is Season)
+                    {
+                        // Stale state entry: the Guid was reassigned to a TV sub-item after a
+                        // library re-index. Skip to avoid orphaned episode cards in the library.
+                        _logger.LogWarning(
+                            "Leaving Soon: item {ItemId} resolved to {ItemType} instead of Series or Movie; skipping",
+                            itemId,
+                            item.GetType().Name);
+                    }
+                    else
+                    {
+                        CreateMovieFolderStructure(libraryPath, item);
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    LogSymlinkPermissionError(ex, itemId);
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogError(ex, "Failed to create leaving-soon entry for item {ItemId} (IO error)", itemId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to create leaving-soon entry for item {ItemId}", itemId);
+                }
             }
         }
 

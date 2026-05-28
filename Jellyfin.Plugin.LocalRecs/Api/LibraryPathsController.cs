@@ -97,6 +97,22 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         }
 
         /// <summary>
+        /// Gets the shared library paths for Leaving Soon and Removal Candidates.
+        /// </summary>
+        /// <returns>Paths for all four shared libraries.</returns>
+        [HttpGet("Setup/SharedPaths")]
+        public ActionResult GetSharedPaths()
+        {
+            return Ok(new
+            {
+                LeavingSoonMoviesPath = _virtualLibraryManager.LeavingSoonMoviesPath,
+                LeavingSoonTvPath = _virtualLibraryManager.LeavingSoonTvPath,
+                RemovalCandidatesMoviesPath = _virtualLibraryManager.RemovalCandidatesMoviesPath,
+                RemovalCandidatesTvPath = _virtualLibraryManager.RemovalCandidatesTvPath
+            });
+        }
+
+        /// <summary>
         /// Gets the latest benchmark results.
         /// </summary>
         /// <returns>Benchmark results as plain text.</returns>

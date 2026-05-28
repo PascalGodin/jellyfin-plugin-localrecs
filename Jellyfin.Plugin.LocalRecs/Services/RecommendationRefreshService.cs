@@ -160,8 +160,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="userIds">List of user IDs to process.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <param name="startTime">Task start time (for duration in the log).</param>
-        /// <returns>Dictionary mapping user IDs to their recommendations (movies, TV).</returns>
-        public Task<Dictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)>> GenerateRecommendationsForMultipleUsersAsync(
+        /// <returns>User recommendations, Leaving Soon state (null when disabled or no eligible profiles), and all scored media items.</returns>
+        public Task<(Dictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)> UserRecs, LeavingSoonState? LeavingSoonState, IReadOnlyList<MediaItemMetadata> AllItems)> GenerateRecommendationsForMultipleUsersAsync(
             IReadOnlyList<Guid> userIds,
             PluginConfiguration config,
             DateTime startTime)
@@ -170,7 +170,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (userIds.Count == 0)
             {
-                return Task.FromResult(results);
+                return Task.FromResult((results, (LeavingSoonState?)null, (IReadOnlyList<MediaItemMetadata>)Array.Empty<MediaItemMetadata>()));
             }
 
             _logger.LogInformation("Generating recommendations for {Count} users", userIds.Count);
@@ -219,6 +219,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             // Run Leaving Soon scoring using the profiles already computed above
             LeavingSoonState? leavingSoonState = null;
             LeavingSoonDiagnostics? leavingSoonDiagnostics = null;
+            var allItems = (IReadOnlyList<MediaItemMetadata>)metadata.Values.ToList();
             if (config.LeavingSoonEnabled)
             {
                 var eligibleProfiles = userLogEntries
@@ -227,7 +228,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     .ToList();
 
                 var lsResult = _leavingSoonService.Refresh(
-                    metadata.Values.ToList(),
+                    allItems,
                     embeddings,
                     eligibleProfiles,
                     watchStatus,
@@ -242,7 +243,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, config, libraryScan, vocabularyBuild, embeddingCompute);
             }
 
-            return Task.FromResult(results);
+            return Task.FromResult((results, leavingSoonState, allItems));
         }
 
         private static void AppendExclusionItems(StringBuilder sb, string label, IReadOnlyList<string> items)

@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.0.20",
+        "changelog": "Add Leaving Soon and Removal Candidates virtual libraries\n- Leaving Soon and Removal Candidates are now exposed as shared virtual libraries in Jellyfin\n- Four libraries created under virtual-libraries/leaving-soon/: movies/, tv/, removal-movies/, removal-tv/\n- Uses the same folder-per-item symlink structure as per-user recommendation libraries (real folder + renamed file symlink)\n- SyncLeavingSoon is called by the task as a peer to per-user SyncRecommendations, after every refresh when Leaving Soon is enabled\n- Setup tab shows the four shared library paths with copy buttons",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.20/jellyfin-plugin-localrecs-v0.6.0.20.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-05-27T00:00:00Z"
+      },
+      {
         "version": "0.6.0.19",
         "changelog": "Fix: config page fields reset to default when set to 0\n- JavaScript || operator treats 0 as falsy, causing fields like FavoriteBoost, MaxVocabularyActors, MaxVocabularyTags, and others to display their default instead of the saved 0 value\n- Replaced || fallback with !== undefined ternary for all numeric fields on the config page",
         "targetAbi": "10.11.9.0",

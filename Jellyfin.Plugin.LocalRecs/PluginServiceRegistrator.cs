@@ -38,7 +38,7 @@ namespace Jellyfin.Plugin.LocalRecs
             // Phase 6: Recommendation Refresh Service
             serviceCollection.AddSingleton<RecommendationRefreshService>();
 
-            // Leaving Soon scoring (diagnostic log output only — no virtual library yet)
+            // Leaving Soon scoring and shared virtual library sync
             serviceCollection.AddSingleton(sp =>
             {
                 var appPaths = sp.GetRequiredService<IApplicationPaths>();
