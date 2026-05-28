@@ -12,7 +12,7 @@
         "changelog": "Add Leaving Soon and Removal Candidates virtual libraries\n- Leaving Soon and Removal Candidates are now exposed as shared virtual libraries in Jellyfin\n- Four libraries created under virtual-libraries/leaving-soon/: movies/, tv/, removal-movies/, removal-tv/\n- Uses the same folder-per-item symlink structure as per-user recommendation libraries (real folder + renamed file symlink)\n- SyncLeavingSoon is called by the task as a peer to per-user SyncRecommendations, after every refresh when Leaving Soon is enabled\n- Setup tab shows the four shared library paths with copy buttons",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.0.20/jellyfin-plugin-localrecs-v0.6.0.20.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "eadc4b8467d09f525216a712c52a5bf3",
         "timestamp": "2026-05-27T00:00:00Z"
       },
       {
