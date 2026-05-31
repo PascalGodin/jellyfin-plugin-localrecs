@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.1.1",
-        "changelog": "Align with Roger's v0.6.1 + Leaving Soon virtual libraries\n- Remove dead PlayCount field from WatchRecord (no longer used after rewatch boost was replaced by decay² in v0.6.0.19)\n- Add regression tests for TV series recency: verify series weight uses most-recent watched episode date, and series with no watched episodes are excluded\n- Leaving Soon and Removal Candidates virtual libraries (carried from v0.6.0.20)",
+        "changelog": "Align with Roger's v0.6.1 + Leaving Soon virtual libraries\n- Remove dead PlayCount field from WatchRecord (no longer used after rewatch boost was replaced by decay\u00b2 in v0.6.0.19)\n- Add regression tests for TV series recency: verify series weight uses most-recent watched episode date, and series with no watched episodes are excluded\n- Leaving Soon and Removal Candidates virtual libraries (carried from v0.6.0.20)",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.1/jellyfin-plugin-localrecs-v0.6.1.1.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "a5cec74425ae90110506210f4ce75d53",
         "timestamp": "2026-05-30T00:00:00Z"
       },
       {
