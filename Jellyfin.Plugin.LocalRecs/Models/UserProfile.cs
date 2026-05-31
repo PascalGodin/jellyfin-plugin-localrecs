@@ -46,10 +46,10 @@ namespace Jellyfin.Plugin.LocalRecs.Models
 
         /// <summary>
         /// Gets or sets the top watched items by taste influence, ordered by weight descending.
-        /// Each entry: (ItemId, Weight, IsFavorite, PlayCount, DaysSince).
+        /// Each entry: (ItemId, Weight, IsFavorite, DaysSince).
         /// </summary>
-        public IReadOnlyList<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)> TopWatchContributions { get; set; }
-            = new List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)>();
+        public IReadOnlyList<(Guid ItemId, float Weight, bool IsFavorite, double DaysSince)> TopWatchContributions { get; set; }
+            = new List<(Guid ItemId, float Weight, bool IsFavorite, double DaysSince)>();
 
         /// <summary>
         /// Gets or sets the average community rating (0-10 scale) from watched items.

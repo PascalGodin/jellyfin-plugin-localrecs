@@ -175,7 +175,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 var record = new WatchRecord(itemId, userId, lastPlayedDate)
                 {
                     IsFavorite = userData.IsFavorite,
-                    PlayCount = userData.PlayCount > 0 ? userData.PlayCount : 1,
                     CommunityRating = item.CommunityRating,
                     CriticRating = item.CriticRating
                 };
@@ -218,7 +217,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="embeddings">Item embeddings.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <returns>Normalized taste vector.</returns>
-        private (float[] TasteVector, List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)> Contributions) ComputeTasteVector(
+        private (float[] TasteVector, List<(Guid ItemId, float Weight, bool IsFavorite, double DaysSince)> Contributions) ComputeTasteVector(
             List<WatchRecord> watchRecords,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             PluginConfiguration config)
@@ -233,7 +232,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var dimension = firstEmbedding.Dimensions;
             var weightedSum = new float[dimension];
             float totalWeight = 0;
-            var contributions = new List<(Guid ItemId, float Weight, bool IsFavorite, int PlayCount, double DaysSince)>();
+            var contributions = new List<(Guid ItemId, float Weight, bool IsFavorite, double DaysSince)>();
 
             var now = DateTime.UtcNow;
 
@@ -254,7 +253,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     (float)config.FavoriteBoost,
                     (float)config.RecentWatchBoost);
 
-                contributions.Add((record.ItemId, weight, record.IsFavorite, record.PlayCount, daysSince));
+                contributions.Add((record.ItemId, weight, record.IsFavorite, daysSince));
 
                 // Accumulate weighted vectors
                 for (int i = 0; i < dimension; i++)

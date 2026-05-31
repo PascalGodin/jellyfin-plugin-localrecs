@@ -8,6 +8,7 @@ using Jellyfin.Plugin.LocalRecs.Models;
 using Jellyfin.Plugin.LocalRecs.Services;
 using Jellyfin.Plugin.LocalRecs.Tests.Fixtures;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -62,7 +63,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var embeddings = CreateEmbeddings(library);
             var metadata = library.ToDictionary(i => i.Id, i => i);
 
-            SetupUserDataMocks(library.Take(3).ToList());
+            SetupUserDataMocks(library.Take(3).ToList(), daysAgo: 30);
 
             // Act
             var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
@@ -83,7 +84,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var embeddings = CreateEmbeddings(library);
             var metadata = library.ToDictionary(i => i.Id, i => i);
 
-            SetupUserDataMocks(library.Take(5).ToList());
+            SetupUserDataMocks(library.Take(5).ToList(), daysAgo: 30);
 
             // Act
             var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
@@ -105,9 +106,9 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var embeddings = CreateEmbeddings(library);
             var metadata = library.ToDictionary(i => i.Id, i => i);
 
-            // Setup: Matrix is favorite, Inception is not (same recency and play count)
-            SetupSpecificUserData(matrix, isFavorite: true, playCount: 1, daysAgo: 7);
-            SetupSpecificUserData(inception, isFavorite: false, playCount: 1, daysAgo: 7);
+            // Setup: Matrix is favorite, Inception is not (same recency)
+            SetupSpecificUserData(matrix, isFavorite: true, daysAgo: 7);
+            SetupSpecificUserData(inception, isFavorite: false, daysAgo: 7);
 
             // Act
             var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
@@ -141,8 +142,8 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var metadata = library.ToDictionary(i => i.Id, i => i);
 
             // Setup: Recent watch (7 days ago) vs old watch (at half-life = 365 days)
-            SetupSpecificUserData(recent, isFavorite: false, playCount: 1, daysAgo: 7);
-            SetupSpecificUserData(old, isFavorite: false, playCount: 1, daysAgo: 365);
+            SetupSpecificUserData(recent, isFavorite: false, daysAgo: 7);
+            SetupSpecificUserData(old, isFavorite: false, daysAgo: 365);
 
             // Act
             var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
@@ -253,7 +254,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
 
             // Setup 3 played items
             var playedItems = library.Take(3).ToList();
-            SetupUserDataMocks(playedItems);
+            SetupUserDataMocks(playedItems, daysAgo: 30);
 
             // Setup 2 unplayed items
             foreach (var item in library.Skip(3).Take(2))
@@ -285,7 +286,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var library = CreateLargeLibrary(100);
             var embeddings = CreateEmbeddings(library);
             var metadata = library.ToDictionary(i => i.Id, i => i);
-            SetupUserDataMocks(library);
+            SetupUserDataMocks(library, daysAgo: 30);
 
             // Act
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -297,6 +298,52 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             profile!.WatchedItemCount.Should().Be(100);
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(100,
                 "acceptance criteria requires <100ms for 100 watched items");
+        }
+
+        [Fact]
+        public void BuildUserProfile_Series_UsesMostRecentWatchedEpisodeDateForRecency()
+        {
+            // Regression test: Jellyfin never sets LastPlayedDate on the series-level UserItemData,
+            // so the old code fell back to "today" for every series, giving them all maximum weight.
+            // Series recency must come from the most recently watched episode.
+            var recentMovie = new MediaItemMetadata(Guid.NewGuid(), "Recent Movie", MediaType.Movie);
+            var oldSeries = new MediaItemMetadata(Guid.NewGuid(), "Old Series", MediaType.Series);
+            var library = new List<MediaItemMetadata> { recentMovie, oldSeries };
+            var embeddings = CreateEmbeddings(library);
+
+            SetupSpecificUserData(recentMovie, isFavorite: false, daysAgo: 7);
+            SetupSeriesWithWatchedEpisode(oldSeries, episodeDaysAgo: 400, isFavorite: false);
+
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
+
+            profile.Should().NotBeNull();
+            profile!.WatchedItemCount.Should().Be(2);
+
+            var movieSimilarity = Utilities.VectorMath.CosineSimilarity(
+                profile.TasteVector, embeddings[recentMovie.Id].Vector);
+            var seriesSimilarity = Utilities.VectorMath.CosineSimilarity(
+                profile.TasteVector, embeddings[oldSeries.Id].Vector);
+
+            movieSimilarity.Should().BeGreaterThan(seriesSimilarity,
+                "a movie watched 7 days ago should outweigh a series whose most recent episode " +
+                "was watched 400 days ago");
+        }
+
+        [Fact]
+        public void BuildUserProfile_Series_WithNoWatchedEpisodes_IsExcluded()
+        {
+            var watchedSeries = new MediaItemMetadata(Guid.NewGuid(), "Watched Series", MediaType.Series);
+            var unwatchedSeries = new MediaItemMetadata(Guid.NewGuid(), "Unwatched Series", MediaType.Series);
+            var library = new List<MediaItemMetadata> { watchedSeries, unwatchedSeries };
+            var embeddings = CreateEmbeddings(library);
+
+            SetupSeriesWithWatchedEpisode(watchedSeries, episodeDaysAgo: 30, isFavorite: false);
+            SetupSeriesWithNoWatchedEpisodes(unwatchedSeries);
+
+            var (profile, _) = _service.BuildUserProfile(_testUserId, embeddings, _config);
+
+            profile.Should().NotBeNull();
+            profile!.WatchedItemCount.Should().Be(1, "only the series with a watched episode should count");
         }
 
         // Helper methods
@@ -357,39 +404,82 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             return embeddings;
         }
 
-        private void SetupUserDataMocks(List<MediaItemMetadata> watchedItems)
+        private void SetupUserDataMocks(List<MediaItemMetadata> watchedItems, int daysAgo)
         {
             foreach (var item in watchedItems)
             {
-                SetupSpecificUserData(item, isFavorite: false, playCount: 1, daysAgo: 30);
+                SetupSpecificUserData(item, isFavorite: false, daysAgo: daysAgo);
             }
         }
 
         private void SetupSpecificUserData(
             MediaItemMetadata item,
             bool isFavorite,
-            int playCount,
             int daysAgo)
         {
-            // Create a minimal mock BaseItem - we can't mock Id since it's not virtual
-            // So we'll just return any BaseItem and match on it being called with that item ID
             var mockItem = new Mock<BaseItem>();
-
             _mockLibraryManager.Setup(m => m.GetItemById(item.Id)).Returns(mockItem.Object);
 
-            // Create actual UserItemData instance - properties are not virtual so can't be mocked
             var userData = new UserItemData
             {
-                Key = item.Id.ToString(), // Required property
+                Key = item.Id.ToString(),
                 Played = true,
                 IsFavorite = isFavorite,
-                PlayCount = playCount,
                 LastPlayedDate = DateTime.UtcNow.AddDays(-daysAgo)
             };
 
-            // Match on the specific mock item returned by GetItemById
             _mockUserDataManager.Setup(m => m.GetUserData(_testUser, mockItem.Object))
                 .Returns(userData);
+        }
+
+        private void SetupSeriesWithWatchedEpisode(
+            MediaItemMetadata seriesMeta,
+            int episodeDaysAgo,
+            bool isFavorite)
+        {
+            var series = new Series { Id = seriesMeta.Id, Name = seriesMeta.Name };
+            _mockLibraryManager.Setup(m => m.GetItemById(seriesMeta.Id)).Returns(series);
+
+            // Series-level user data has no LastPlayedDate, mirroring real Jellyfin behaviour.
+            var seriesUserData = new UserItemData
+            {
+                Key = seriesMeta.Id.ToString(),
+                IsFavorite = isFavorite,
+                Played = false
+            };
+            _mockUserDataManager.Setup(m => m.GetUserData(_testUser, series)).Returns(seriesUserData);
+
+            var episode = new Episode { Id = Guid.NewGuid(), Name = seriesMeta.Name + " S01E01" };
+            _mockLibraryManager
+                .Setup(m => m.GetItemList(It.Is<InternalItemsQuery>(q =>
+                    q.AncestorIds != null && q.AncestorIds.Contains(seriesMeta.Id))))
+                .Returns(new List<BaseItem> { episode });
+
+            var episodeUserData = new UserItemData
+            {
+                Key = episode.Id.ToString(),
+                Played = true,
+                LastPlayedDate = DateTime.UtcNow.AddDays(-episodeDaysAgo)
+            };
+            _mockUserDataManager.Setup(m => m.GetUserData(_testUser, episode)).Returns(episodeUserData);
+        }
+
+        private void SetupSeriesWithNoWatchedEpisodes(MediaItemMetadata seriesMeta)
+        {
+            var series = new Series { Id = seriesMeta.Id, Name = seriesMeta.Name };
+            _mockLibraryManager.Setup(m => m.GetItemById(seriesMeta.Id)).Returns(series);
+
+            var seriesUserData = new UserItemData
+            {
+                Key = seriesMeta.Id.ToString(),
+                Played = false
+            };
+            _mockUserDataManager.Setup(m => m.GetUserData(_testUser, series)).Returns(seriesUserData);
+
+            _mockLibraryManager
+                .Setup(m => m.GetItemList(It.Is<InternalItemsQuery>(q =>
+                    q.AncestorIds != null && q.AncestorIds.Contains(seriesMeta.Id))))
+                .Returns(new List<BaseItem>());
         }
     }
 }

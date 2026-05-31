@@ -708,13 +708,6 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Integration
                 if (item.TryGetProperty("UserData", out var userDataForWeight))
                 {
                     bool isFavorite = userDataForWeight.TryGetProperty("IsFavorite", out var fav) && fav.GetBoolean();
-                    int playCount = userDataForWeight.TryGetProperty("PlayCount", out var pc) ? pc.GetInt32() : 1;
-                    
-                    // Ensure playCount is at least 1 for watched items (Jellyfin sometimes returns 0)
-                    if (playCount < 1)
-                    {
-                        playCount = 1;
-                    }
 
                     DateTime lastPlayed = DateTime.UtcNow;
                     if (userDataForWeight.TryGetProperty("LastPlayedDate", out var lpd))
