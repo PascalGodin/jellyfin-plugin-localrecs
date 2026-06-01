@@ -12,7 +12,7 @@
         "changelog": "Diagnostic log formatting improvements\n- Reorganize CONFIG section into Recommendations / Vocabulary limits / Leaving Soon subsections\n- Collapse cold-start users into a single grouped block (all share identical rating-based recommendations)\n- Remove score distribution stats (min/max/mean/spread) from personalized user sections\n- Group Leaving Soon flagged items, removal candidates, and too-young details by Movies / TV subheaders\n- Add [Movie]/[TV] type label replaced by grouped subheaders throughout Leaving Soon section\n- Fold 'Profiles used' count into the Discovery header line",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.2/jellyfin-plugin-localrecs-v0.6.1.2.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "0db3059c2a2df8779eff9c23b6d28cfa",
         "timestamp": "2026-06-01T00:00:00Z"
       },
       {
