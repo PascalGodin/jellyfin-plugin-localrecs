@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.2",
+        "changelog": "Diagnostic log formatting improvements\n- Reorganize CONFIG section into Recommendations / Vocabulary limits / Leaving Soon subsections\n- Collapse cold-start users into a single grouped block (all share identical rating-based recommendations)\n- Remove score distribution stats (min/max/mean/spread) from personalized user sections\n- Group Leaving Soon flagged items, removal candidates, and too-young details by Movies / TV subheaders\n- Add [Movie]/[TV] type label replaced by grouped subheaders throughout Leaving Soon section\n- Fold 'Profiles used' count into the Discovery header line",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.2/jellyfin-plugin-localrecs-v0.6.1.2.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-01T00:00:00Z"
+      },
+      {
         "version": "0.6.1.1",
         "changelog": "Align with Roger's v0.6.1 + Leaving Soon virtual libraries\n- Remove dead PlayCount field from WatchRecord (no longer used after rewatch boost was replaced by decay\u00b2 in v0.6.0.19)\n- Add regression tests for TV series recency: verify series weight uses most-recent watched episode date, and series with no watched episodes are excluded\n- Leaving Soon and Removal Candidates virtual libraries (carried from v0.6.0.20)",
         "targetAbi": "10.11.9.0",
