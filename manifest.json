@@ -12,7 +12,7 @@
         "changelog": "Fix: raising LeavingSoonMinAgeDays did not evict already-flagged items\n- Previously-flagged items with no watch date used TimeSpan.MaxValue as age, making them unconditionally age-eligible regardless of config changes\n- Removed the fast-path optimization for already-flagged items; all items now go through GetItemById for a consistent age calculation\n- Raising min age now correctly evicts flagged items that no longer qualify",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.3/jellyfin-plugin-localrecs-v0.6.1.3.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "d761a799b7e6111cd19c390b5d0c7627",
         "timestamp": "2026-06-02T00:00:00Z"
       },
       {
