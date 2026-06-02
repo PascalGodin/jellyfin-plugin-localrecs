@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.3",
+        "changelog": "Fix: raising LeavingSoonMinAgeDays did not evict already-flagged items\n- Previously-flagged items with no watch date used TimeSpan.MaxValue as age, making them unconditionally age-eligible regardless of config changes\n- Removed the fast-path optimization for already-flagged items; all items now go through GetItemById for a consistent age calculation\n- Raising min age now correctly evicts flagged items that no longer qualify",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.3/jellyfin-plugin-localrecs-v0.6.1.3.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-02T00:00:00Z"
+      },
+      {
         "version": "0.6.1.2",
         "changelog": "Diagnostic log formatting improvements\n- Reorganize CONFIG section into Recommendations / Vocabulary limits / Leaving Soon subsections\n- Collapse cold-start users into a single grouped block (all share identical rating-based recommendations)\n- Remove score distribution stats (min/max/mean/spread) from personalized user sections\n- Group Leaving Soon flagged items, removal candidates, and too-young details by Movies / TV subheaders\n- Add [Movie]/[TV] type label replaced by grouped subheaders throughout Leaving Soon section\n- Fold 'Profiles used' count into the Discovery header line",
         "targetAbi": "10.11.9.0",

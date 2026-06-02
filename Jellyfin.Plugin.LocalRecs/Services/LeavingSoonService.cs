@@ -155,8 +155,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 EligibleProfileCount = eligibleProfiles.Count
             };
 
-            // Score all eligible items, tracking days until age-eligible for worst-X candidates.
-            // Previously-flagged items use watch-date alone to avoid a redundant GetItemById call.
             var scoredMovies = new List<(string Id, float Score, double DaysUntilEligible)>();
             var scoredTv = new List<(string Id, float Score, double DaysUntilEligible)>();
 
@@ -190,28 +188,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     continue;
                 }
 
-                double daysUntilEligible;
-                if (state.FlaggedItems.ContainsKey(id))
+                var item = _libraryManager.GetItemById(meta.Id);
+                if (item == null)
                 {
-                    var timeSinceWatch = ws.LatestWatchDate.HasValue ? (now - ws.LatestWatchDate.Value) : TimeSpan.MaxValue;
-                    daysUntilEligible = timeSinceWatch >= minAge ? 0 : (minAge - timeSinceWatch).TotalDays;
+                    diag.SkippedNotFound++;
+                    continue;
                 }
-                else
-                {
-                    var item = _libraryManager.GetItemById(meta.Id);
-                    if (item == null)
-                    {
-                        diag.SkippedNotFound++;
-                        continue;
-                    }
 
-                    var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
-                    var timeSinceAdded = now - addedDate;
-                    var effectiveAge = ws.LatestWatchDate.HasValue
-                        ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
-                        : timeSinceAdded;
-                    daysUntilEligible = effectiveAge >= minAge ? 0 : (minAge - effectiveAge).TotalDays;
-                }
+                var addedDate = item is Folder folder ? (folder.DateLastMediaAdded ?? folder.DateCreated) : item.DateCreated;
+                var timeSinceAdded = now - addedDate;
+                var effectiveAge = ws.LatestWatchDate.HasValue
+                    ? TimeSpan.FromTicks(Math.Min(timeSinceAdded.Ticks, (now - ws.LatestWatchDate.Value).Ticks))
+                    : timeSinceAdded;
+                double daysUntilEligible = effectiveAge >= minAge ? 0 : (minAge - effectiveAge).TotalDays;
 
                 var maxSimilarity = 0f;
                 foreach (var profile in eligibleProfiles)
