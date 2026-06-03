@@ -227,7 +227,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                 return;
             }
 
-            _taskManager.Execute(scanWorker, new TaskOptions());
+            _ = _taskManager.Execute(scanWorker, new TaskOptions());
             _logger.LogInformation("Library scan triggered; waiting for completion");
 
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
