@@ -313,15 +313,55 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 summarySb.AppendLine("  Leaving Soon: disabled");
             }
 
+            // Jellyfin DB staleness check: find items still indexed whose path no longer exists on disk.
+            // TopParentIds queries return 0 (Jellyfin deduplicates symlinks against the main library),
+            // so we query all movies/series and filter by path prefix in memory instead.
+            var dbStaleSb = new StringBuilder();
+            if (Directory.Exists(_virtualLibraryBasePath))
+            {
+                var jellyfinItems = _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Series },
+                    Recursive = true
+                });
+
+                var staleDbItems = jellyfinItems
+                    .Where(item =>
+                        !string.IsNullOrEmpty(item.Path) &&
+                        item.Path.StartsWith(_virtualLibraryBasePath, StringComparison.OrdinalIgnoreCase) &&
+                        !File.Exists(item.Path) &&
+                        !Directory.Exists(item.Path))
+                    .OrderBy(item => item.Name)
+                    .ToList();
+
+                if (staleDbItems.Count > 0)
+                {
+                    dbStaleSb.AppendLine($"  {staleDbItems.Count} item(s) still indexed in Jellyfin DB but missing from disk:");
+                    foreach (var item in staleDbItems)
+                    {
+                        var year = item.ProductionYear.HasValue ? $" ({item.ProductionYear})" : string.Empty;
+                        dbStaleSb.AppendLine($"    - {item.Name}{year}  [{item.GetType().Name}]");
+                        dbStaleSb.AppendLine($"      {item.Path}");
+                    }
+                }
+                else
+                {
+                    dbStaleSb.AppendLine("  Jellyfin DB: no stale entries detected");
+                }
+            }
+
             var report = new StringBuilder();
             report.AppendLine();
             report.AppendLine("POST-SYNC: FILESYSTEM CHECK");
             report.Append(summarySb);
             if (issueSb.Length > 0)
             {
-                report.AppendLine("  --- ISSUES ---");
+                report.AppendLine("  --- FILESYSTEM ISSUES ---");
                 report.Append(issueSb);
             }
+
+            report.AppendLine("POST-SYNC: JELLYFIN DB CHECK");
+            report.Append(dbStaleSb);
 
             return report.ToString();
         }

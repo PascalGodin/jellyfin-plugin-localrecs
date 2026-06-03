@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.7",
+        "changelog": "POST-SYNC: add Jellyfin DB stale entry detection\n- After the filesystem check, query all Movies and Series in Jellyfin whose path starts with the virtual library base path\n- Any item whose path no longer exists on disk is a stale DB entry (Jellyfin indexed it when it was in a virtual library but hasn't cleaned up after the symlink folder was deleted)\n- Reported under POST-SYNC: JELLYFIN DB CHECK with item name, year, type, and full path\n- No deletions; detection only",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.7/jellyfin-plugin-localrecs-v0.6.1.7.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-03T00:00:00Z"
+      },
+      {
         "version": "0.6.1.6",
         "changelog": "POST-SYNC: switch stale check from Jellyfin DB query to filesystem check\n- GetItemList(TopParentIds) returned indexed=0 for all virtual libraries because Jellyfin does not create separate DB entries for symlinked files\n- Now compares directories actually on disk in each virtual library path against the expected folder names derived from current recommendations\n- Reports extra folders on disk (items that should have been deleted but weren't) and missing folders (items the sync failed to create)\n- Per-library summary line: disk=N, expected=N, extra=N, missing=N",
         "targetAbi": "10.11.9.0",
