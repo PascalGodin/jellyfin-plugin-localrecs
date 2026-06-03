@@ -201,6 +201,110 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 state.RemovalCandidates.Count);
         }
 
+        /// <summary>
+        /// Queries Jellyfin's DB for items still indexed in plugin virtual libraries that are not
+        /// in the current recommendations or Leaving Soon state. Call after syncing AND after
+        /// awaiting a library scan so results reflect genuine stale DB entries.
+        /// </summary>
+        /// <param name="allUsers">All Jellyfin users with IDs and display names.</param>
+        /// <param name="userRecommendations">Current recommendations keyed by user ID.</param>
+        /// <param name="leavingSoonState">Current Leaving Soon state, or null if disabled.</param>
+        /// <param name="allItems">All library metadata, used to type-split Leaving Soon IDs.</param>
+        /// <returns>Formatted report string, or empty string if nothing is stale.</returns>
+        public string BuildStaleItemsReport(
+            IEnumerable<(Guid Id, string Username)> allUsers,
+            IReadOnlyDictionary<Guid, (List<ScoredRecommendation> Movies, List<ScoredRecommendation> Tv)> userRecommendations,
+            LeavingSoonState? leavingSoonState,
+            IReadOnlyList<MediaItemMetadata> allItems)
+        {
+            if (allUsers == null)
+            {
+                throw new ArgumentNullException(nameof(allUsers));
+            }
+
+            if (userRecommendations == null)
+            {
+                throw new ArgumentNullException(nameof(userRecommendations));
+            }
+
+            if (allItems == null)
+            {
+                throw new ArgumentNullException(nameof(allItems));
+            }
+
+            var virtualFolders = _libraryManager.GetVirtualFolders();
+            var sb = new StringBuilder();
+            var anyStale = false;
+
+            void CheckLibrary(string libraryPath, string label, HashSet<Guid> validIds, BaseItemKind itemKind)
+            {
+                var folder = virtualFolders.FirstOrDefault(f =>
+                    f.Locations != null &&
+                    f.Locations.Any(loc => loc.Equals(libraryPath, StringComparison.OrdinalIgnoreCase)));
+
+                if (folder == null || string.IsNullOrEmpty(folder.ItemId) || !Guid.TryParse(folder.ItemId, out var folderId))
+                {
+                    return;
+                }
+
+                var indexedItems = _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    TopParentIds = new[] { folderId },
+                    IncludeItemTypes = new[] { itemKind },
+                    Recursive = true
+                });
+
+                var staleItems = indexedItems.Where(item => !validIds.Contains(item.Id)).ToList();
+                if (staleItems.Count == 0)
+                {
+                    return;
+                }
+
+                anyStale = true;
+                sb.AppendLine($"  {label} ({staleItems.Count}):");
+                foreach (var staleItem in staleItems)
+                {
+                    var year = staleItem.ProductionYear.HasValue ? $" ({staleItem.ProductionYear})" : string.Empty;
+                    sb.AppendLine($"    - {staleItem.Name ?? staleItem.Id.ToString()}{year}");
+                }
+            }
+
+            foreach (var user in allUsers)
+            {
+                userRecommendations.TryGetValue(user.Id, out var recs);
+                var validMovieIds = recs.Movies != null
+                    ? recs.Movies.Select(r => r.ItemId).ToHashSet()
+                    : new HashSet<Guid>();
+                var validTvIds = recs.Tv != null
+                    ? recs.Tv.Select(r => r.ItemId).ToHashSet()
+                    : new HashSet<Guid>();
+
+                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Movie), $"{user.Username} — Movies", validMovieIds, BaseItemKind.Movie);
+                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Series), $"{user.Username} — TV", validTvIds, BaseItemKind.Series);
+            }
+
+            if (leavingSoonState != null)
+            {
+                var metaById = new Dictionary<string, MediaItemMetadata>(StringComparer.OrdinalIgnoreCase);
+                foreach (var m in allItems)
+                {
+                    metaById[m.Id.ToString()] = m;
+                }
+
+                CheckLibrary(LeavingSoonMoviesPath, "Leaving Soon — Movies", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Movie).ToHashSet(), BaseItemKind.Movie);
+                CheckLibrary(LeavingSoonTvPath, "Leaving Soon — TV", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Series).ToHashSet(), BaseItemKind.Series);
+                CheckLibrary(RemovalCandidatesMoviesPath, "Removal Candidates — Movies", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToHashSet(), BaseItemKind.Movie);
+                CheckLibrary(RemovalCandidatesTvPath, "Removal Candidates — TV", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToHashSet(), BaseItemKind.Series);
+            }
+
+            if (!anyStale)
+            {
+                return string.Empty;
+            }
+
+            return "\nPOST-SYNC: STALE JELLYFIN DB ENTRIES\n  (still indexed after sync + library scan)\n" + sb;
+        }
+
         private static IEnumerable<Guid> FilterIds(
             Dictionary<string, DateTime> stateDict,
             Dictionary<string, MediaItemMetadata> metaById,

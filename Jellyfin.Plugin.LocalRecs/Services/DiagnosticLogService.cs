@@ -20,6 +20,21 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>Appends content to the existing log file without overwriting it.</summary>
+        /// <param name="content">The text to append.</param>
+        public void Append(string content)
+        {
+            try
+            {
+                var path = GetLogFilePath();
+                File.AppendAllText(path, content);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to append to diagnostic log");
+            }
+        }
+
         /// <summary>Saves the log content to disk, overwriting any previous run.</summary>
         /// <param name="content">The text to write.</param>
         public void Save(string content)

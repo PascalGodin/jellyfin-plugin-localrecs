@@ -23,6 +23,8 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         private readonly IUserManager _userManager;
         private readonly RecommendationRefreshService _refreshService;
         private readonly VirtualLibraryManager _virtualLibraryManager;
+        private readonly DiagnosticLogService _diagnosticLogService;
+        private readonly ITaskManager _taskManager;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationRefreshTask"/> class.
@@ -31,16 +33,22 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         /// <param name="userManager">User manager.</param>
         /// <param name="refreshService">Recommendation refresh service.</param>
         /// <param name="virtualLibraryManager">Virtual library manager.</param>
+        /// <param name="diagnosticLogService">Diagnostic log service for appending post-sync results.</param>
+        /// <param name="taskManager">Task manager for triggering library scans.</param>
         public RecommendationRefreshTask(
             ILogger<RecommendationRefreshTask> logger,
             IUserManager userManager,
             RecommendationRefreshService refreshService,
-            VirtualLibraryManager virtualLibraryManager)
+            VirtualLibraryManager virtualLibraryManager,
+            DiagnosticLogService diagnosticLogService,
+            ITaskManager taskManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _refreshService = refreshService ?? throw new ArgumentNullException(nameof(refreshService));
             _virtualLibraryManager = virtualLibraryManager ?? throw new ArgumentNullException(nameof(virtualLibraryManager));
+            _diagnosticLogService = diagnosticLogService ?? throw new ArgumentNullException(nameof(diagnosticLogService));
+            _taskManager = taskManager ?? throw new ArgumentNullException(nameof(taskManager));
         }
 
         /// <inheritdoc />
@@ -140,15 +148,32 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
 
                 progress?.Report(90);
 
-                // Step 4: Wait for file system to flush, then trigger library scan (90-95% progress)
+                // Step 4: Trigger library scan and wait, then check for stale DB entries (90-95% progress)
                 _logger.LogDebug("Waiting for file system flush before triggering library scan");
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                await TriggerAndAwaitLibraryScanAsync(cancellationToken).ConfigureAwait(false);
 
-                LogLibraryScanInstructions();
+                var staleReport = string.Empty;
+                try
+                {
+                    staleReport = _virtualLibraryManager.BuildStaleItemsReport(
+                        users.Select(u => (u.Id, u.Username ?? "Unknown")),
+                        userRecommendations,
+                        leavingSoonState,
+                        allItems);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to build stale items report");
+                }
+
+                if (!string.IsNullOrEmpty(staleReport))
+                {
+                    _diagnosticLogService.Append(staleReport);
+                    _logger.LogWarning("Stale library entries detected after sync + scan; see diagnostic log for details");
+                }
 
                 progress?.Report(95);
-
-                // Note: Play status sync happens automatically via ItemAdded event when Jellyfin scans the new .strm files
 
                 // Step 5: Report results (100% progress)
                 var duration = DateTime.UtcNow - startTime;
@@ -191,9 +216,36 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
             };
         }
 
-        private void LogLibraryScanInstructions()
+        private async Task TriggerAndAwaitLibraryScanAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Virtual library files updated. Scan recommendation libraries manually or wait for the next scheduled scan to see updates.");
+            var scanWorker = _taskManager.ScheduledTasks
+                .FirstOrDefault(t => string.Equals(t.ScheduledTask.Key, "RefreshLibrary", StringComparison.OrdinalIgnoreCase));
+
+            if (scanWorker == null)
+            {
+                _logger.LogWarning("Library scan task not found; scan recommendation libraries manually to see updates");
+                return;
+            }
+
+            _taskManager.Execute(scanWorker, new TaskOptions());
+            _logger.LogInformation("Library scan triggered; waiting for completion");
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+
+            var deadline = DateTime.UtcNow.AddMinutes(5);
+            while (scanWorker.State != TaskState.Idle && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (scanWorker.State == TaskState.Idle)
+            {
+                _logger.LogInformation("Library scan completed");
+            }
+            else
+            {
+                _logger.LogWarning("Library scan did not complete within 5 minutes; proceeding with stale item check");
+            }
         }
     }
 }
