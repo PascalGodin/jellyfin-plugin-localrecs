@@ -12,7 +12,7 @@
         "changelog": "DB stale check: always write diagnostic section to log\n- POST-SYNC: DB STALE CHECK section now always appended to recommendation_log.txt after each run\n- Shows total virtual folders known to Jellyfin, and per-library: folder ID, indexed item count, valid item count, stale item count\n- If folder is not registered in Jellyfin the line says so explicitly\n- Stale items (if any) listed below the summary table",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.5/jellyfin-plugin-localrecs-v0.6.1.5.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "16e9fa187ccacecd814df9813b1c2f0e",
         "timestamp": "2026-06-03T00:00:00Z"
       },
       {
