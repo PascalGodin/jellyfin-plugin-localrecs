@@ -20,7 +20,7 @@
         "changelog": "POST-SYNC: switch stale check from Jellyfin DB query to filesystem check\n- GetItemList(TopParentIds) returned indexed=0 for all virtual libraries because Jellyfin does not create separate DB entries for symlinked files\n- Now compares directories actually on disk in each virtual library path against the expected folder names derived from current recommendations\n- Reports extra folders on disk (items that should have been deleted but weren't) and missing folders (items the sync failed to create)\n- Per-library summary line: disk=N, expected=N, extra=N, missing=N",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.6/jellyfin-plugin-localrecs-v0.6.1.6.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "f66f3ab8e584315d3852c64b0d87b029",
         "timestamp": "2026-06-03T00:00:00Z"
       },
       {
