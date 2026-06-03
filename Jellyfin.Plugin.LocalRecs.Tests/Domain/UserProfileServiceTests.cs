@@ -382,10 +382,15 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             foreach (var item in library)
             {
                 var vector = new float[dimension];
-                // Create a simple test vector (just use item index for variation)
+                var stableHash = 0;
+                unchecked
+                {
+                    foreach (var c in item.Name) stableHash = (stableHash * 31) + c;
+                }
+
                 for (int i = 0; i < dimension; i++)
                 {
-                    vector[i] = (float)Math.Sin(i + item.Name.GetHashCode() % 100);
+                    vector[i] = (float)Math.Sin(i + (stableHash % 100));
                 }
 
                 // Normalize
