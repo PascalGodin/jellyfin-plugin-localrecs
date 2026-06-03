@@ -12,7 +12,7 @@
         "changelog": "Post-sync stale DB entry detection and automatic library scan\n- After each recommendation refresh, automatically trigger Jellyfin's built-in library scan and wait for completion (up to 5 minutes)\n- Query Jellyfin's DB after the scan to detect items still indexed in plugin-managed libraries (per-user + Leaving Soon/Removal) that should have been removed\n- If stale entries are found, append a report to the diagnostic log under POST-SYNC: STALE JELLYFIN DB ENTRIES\n- Covers all virtual libraries: per-user Movies/TV and shared Leaving Soon/Removal Candidates",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.4/jellyfin-plugin-localrecs-v0.6.1.4.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "2969a27741acf4f2f04e484af6df9518",
         "timestamp": "2026-06-02T00:00:00Z"
       },
       {
