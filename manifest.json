@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.6",
+        "changelog": "POST-SYNC: switch stale check from Jellyfin DB query to filesystem check\n- GetItemList(TopParentIds) returned indexed=0 for all virtual libraries because Jellyfin does not create separate DB entries for symlinked files\n- Now compares directories actually on disk in each virtual library path against the expected folder names derived from current recommendations\n- Reports extra folders on disk (items that should have been deleted but weren't) and missing folders (items the sync failed to create)\n- Per-library summary line: disk=N, expected=N, extra=N, missing=N",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.6/jellyfin-plugin-localrecs-v0.6.1.6.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-03T00:00:00Z"
+      },
+      {
         "version": "0.6.1.5",
         "changelog": "DB stale check: always write diagnostic section to log\n- POST-SYNC: DB STALE CHECK section now always appended to recommendation_log.txt after each run\n- Shows total virtual folders known to Jellyfin, and per-library: folder ID, indexed item count, valid item count, stale item count\n- If folder is not registered in Jellyfin the line says so explicitly\n- Stale items (if any) listed below the summary table",
         "targetAbi": "10.11.9.0",

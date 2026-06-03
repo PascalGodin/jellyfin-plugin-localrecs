@@ -232,39 +232,51 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 throw new ArgumentNullException(nameof(allItems));
             }
 
-            var virtualFolders = _libraryManager.GetVirtualFolders();
-            var sb = new StringBuilder();
-            var staleSb = new StringBuilder();
+            var summarySb = new StringBuilder();
+            var issueSb = new StringBuilder();
 
-            void CheckLibrary(string libraryPath, string label, HashSet<Guid> validIds, BaseItemKind itemKind)
+            void CheckLibrary(string libraryPath, string label, HashSet<Guid> validIds)
             {
-                var folder = virtualFolders.FirstOrDefault(f =>
-                    f.Locations != null &&
-                    f.Locations.Any(loc => loc.Equals(libraryPath, StringComparison.OrdinalIgnoreCase)));
-
-                if (folder == null || string.IsNullOrEmpty(folder.ItemId) || !Guid.TryParse(folder.ItemId, out var folderId))
+                if (!Directory.Exists(libraryPath))
                 {
-                    sb.AppendLine($"  {label}: folder not registered in Jellyfin");
+                    summarySb.AppendLine($"  {label}: directory does not exist on disk");
                     return;
                 }
 
-                var indexedItems = _libraryManager.GetItemList(new InternalItemsQuery
-                {
-                    TopParentIds = new[] { folderId },
-                    IncludeItemTypes = new[] { itemKind },
-                    Recursive = true
-                });
+                var dirsOnDisk = new HashSet<string>(
+                    Directory.GetDirectories(libraryPath).Select(Path.GetFileName).Where(n => n != null).Cast<string>(),
+                    StringComparer.OrdinalIgnoreCase);
 
-                var staleItems = indexedItems.Where(item => !validIds.Contains(item.Id)).ToList();
-                sb.AppendLine($"  {label}: folder={folderId}, indexed={indexedItems.Count}, valid={validIds.Count}, stale={staleItems.Count}");
-
-                if (staleItems.Count > 0)
+                var expectedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var id in validIds)
                 {
-                    staleSb.AppendLine($"  {label} ({staleItems.Count} stale):");
-                    foreach (var staleItem in staleItems)
+                    var item = _libraryManager.GetItemById(id);
+                    if (item != null)
                     {
-                        var year = staleItem.ProductionYear.HasValue ? $" ({staleItem.ProductionYear})" : string.Empty;
-                        staleSb.AppendLine($"    - {staleItem.Name ?? staleItem.Id.ToString()}{year}");
+                        expectedFolders.Add(GenerateFolderName(item));
+                    }
+                }
+
+                var extraOnDisk = dirsOnDisk.Where(d => !expectedFolders.Contains(d)).OrderBy(d => d).ToList();
+                var missingFromDisk = expectedFolders.Where(d => !dirsOnDisk.Contains(d)).OrderBy(d => d).ToList();
+
+                summarySb.AppendLine($"  {label}: disk={dirsOnDisk.Count}, expected={expectedFolders.Count}, extra={extraOnDisk.Count}, missing={missingFromDisk.Count}");
+
+                if (extraOnDisk.Count > 0)
+                {
+                    issueSb.AppendLine($"  {label} — EXTRA on disk (should have been deleted):");
+                    foreach (var folder in extraOnDisk)
+                    {
+                        issueSb.AppendLine($"    + {folder}");
+                    }
+                }
+
+                if (missingFromDisk.Count > 0)
+                {
+                    issueSb.AppendLine($"  {label} — MISSING from disk (sync may have failed to create):");
+                    foreach (var folder in missingFromDisk)
+                    {
+                        issueSb.AppendLine($"    - {folder}");
                     }
                 }
             }
@@ -279,8 +291,8 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                     ? recs.Tv.Select(r => r.ItemId).ToHashSet()
                     : new HashSet<Guid>();
 
-                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Movie), $"{user.Username} — Movies", validMovieIds, BaseItemKind.Movie);
-                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Series), $"{user.Username} — TV", validTvIds, BaseItemKind.Series);
+                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Movie), $"{user.Username} — Movies", validMovieIds);
+                CheckLibrary(GetUserLibraryPath(user.Id, MediaType.Series), $"{user.Username} — TV", validTvIds);
             }
 
             if (leavingSoonState != null)
@@ -291,25 +303,24 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                     metaById[m.Id.ToString()] = m;
                 }
 
-                CheckLibrary(LeavingSoonMoviesPath, "Leaving Soon — Movies", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Movie).ToHashSet(), BaseItemKind.Movie);
-                CheckLibrary(LeavingSoonTvPath, "Leaving Soon — TV", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Series).ToHashSet(), BaseItemKind.Series);
-                CheckLibrary(RemovalCandidatesMoviesPath, "Removal Candidates — Movies", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToHashSet(), BaseItemKind.Movie);
-                CheckLibrary(RemovalCandidatesTvPath, "Removal Candidates — TV", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToHashSet(), BaseItemKind.Series);
+                CheckLibrary(LeavingSoonMoviesPath, "Leaving Soon — Movies", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Movie).ToHashSet());
+                CheckLibrary(LeavingSoonTvPath, "Leaving Soon — TV", FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Series).ToHashSet());
+                CheckLibrary(RemovalCandidatesMoviesPath, "Removal Candidates — Movies", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToHashSet());
+                CheckLibrary(RemovalCandidatesTvPath, "Removal Candidates — TV", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToHashSet());
             }
             else
             {
-                sb.AppendLine("  Leaving Soon: disabled");
+                summarySb.AppendLine("  Leaving Soon: disabled");
             }
 
             var report = new StringBuilder();
             report.AppendLine();
-            report.AppendLine("POST-SYNC: DB STALE CHECK");
-            report.AppendLine($"  Virtual folders known to Jellyfin: {virtualFolders.Count}");
-            report.Append(sb);
-            if (staleSb.Length > 0)
+            report.AppendLine("POST-SYNC: FILESYSTEM CHECK");
+            report.Append(summarySb);
+            if (issueSb.Length > 0)
             {
-                report.AppendLine("  --- STALE ITEMS (still indexed after sync + scan) ---");
-                report.Append(staleSb);
+                report.AppendLine("  --- ISSUES ---");
+                report.Append(issueSb);
             }
 
             return report.ToString();
