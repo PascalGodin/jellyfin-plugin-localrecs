@@ -313,12 +313,17 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 summarySb.AppendLine("  Leaving Soon: disabled");
             }
 
-            // Jellyfin DB staleness check: find items still indexed whose path no longer exists on disk.
-            // TopParentIds queries return 0 (Jellyfin deduplicates symlinks against the main library),
-            // so we query all movies/series and filter by path prefix in memory instead.
+            // Jellyfin DB staleness check: find items still indexed whose path no longer exists on disk,
+            // then remove them. TopParentIds queries return 0 (Jellyfin deduplicates symlinks against
+            // the main library), so we query all movies/series and filter by path prefix in memory.
+            // Trailing separator on normalizedBasePath prevents a prefix like ".../virtual-libraries"
+            // from accidentally matching ".../virtual-libraries-other/...".
             var dbStaleSb = new StringBuilder();
             if (Directory.Exists(_virtualLibraryBasePath))
             {
+                var normalizedBasePath = _virtualLibraryBasePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+
                 var jellyfinItems = _libraryManager.GetItemList(new InternalItemsQuery
                 {
                     IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Series },
@@ -328,7 +333,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 var staleDbItems = jellyfinItems
                     .Where(item =>
                         !string.IsNullOrEmpty(item.Path) &&
-                        item.Path.StartsWith(_virtualLibraryBasePath, StringComparison.OrdinalIgnoreCase) &&
+                        item.Path.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase) &&
                         !File.Exists(item.Path) &&
                         !Directory.Exists(item.Path))
                     .OrderBy(item => item.Name)
@@ -336,12 +341,21 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
                 if (staleDbItems.Count > 0)
                 {
-                    dbStaleSb.AppendLine($"  {staleDbItems.Count} item(s) still indexed in Jellyfin DB but missing from disk:");
+                    dbStaleSb.AppendLine($"  {staleDbItems.Count} stale DB entry(ies) removed:");
                     foreach (var item in staleDbItems)
                     {
                         var year = item.ProductionYear.HasValue ? $" ({item.ProductionYear})" : string.Empty;
                         dbStaleSb.AppendLine($"    - {item.Name}{year}  [{item.GetType().Name}]");
                         dbStaleSb.AppendLine($"      {item.Path}");
+                        try
+                        {
+                            _libraryManager.DeleteItem(item, new DeleteOptions { DeleteFileLocation = false });
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to remove stale DB entry for {ItemName} ({ItemPath})", item.Name, item.Path);
+                            dbStaleSb.AppendLine($"      [DELETE FAILED: {ex.Message}]");
+                        }
                     }
                 }
                 else

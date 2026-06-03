@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.8",
+        "changelog": "POST-SYNC: automatically delete stale Jellyfin DB entries\n- After detecting items in Jellyfin DB whose path starts with the virtual library base path but no longer exists on disk, now calls ILibraryManager.DeleteItem(item, DeleteFileLocation=false) to remove them\n- Uses normalizedBasePath with trailing separator to prevent false prefix matches (e.g. virtual-libraries-other)\n- Each deletion is individually try/caught; failures are logged and noted in the diagnostic report\n- Report section now says 'stale DB entry(ies) removed' instead of 'still indexed'",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.8/jellyfin-plugin-localrecs-v0.6.1.8.zip",
+        "checksum": "checksum_placeholder",
+        "timestamp": "2026-06-03T00:00:00Z"
+      },
+      {
         "version": "0.6.1.7",
         "changelog": "POST-SYNC: add Jellyfin DB stale entry detection\n- After the filesystem check, query all Movies and Series in Jellyfin whose path starts with the virtual library base path\n- Any item whose path no longer exists on disk is a stale DB entry (Jellyfin indexed it when it was in a virtual library but hasn't cleaned up after the symlink folder was deleted)\n- Reported under POST-SYNC: JELLYFIN DB CHECK with item name, year, type, and full path\n- No deletions; detection only",
         "targetAbi": "10.11.9.0",
