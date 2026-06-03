@@ -12,7 +12,7 @@
         "changelog": "POST-SYNC: automatically delete stale Jellyfin DB entries\n- After detecting items in Jellyfin DB whose path starts with the virtual library base path but no longer exists on disk, now calls ILibraryManager.DeleteItem(item, DeleteFileLocation=false) to remove them\n- Uses normalizedBasePath with trailing separator to prevent false prefix matches (e.g. virtual-libraries-other)\n- Each deletion is individually try/caught; failures are logged and noted in the diagnostic report\n- Report section now says 'stale DB entry(ies) removed' instead of 'still indexed'",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.8/jellyfin-plugin-localrecs-v0.6.1.8.zip",
-        "checksum": "checksum_placeholder",
+        "checksum": "a4459d46b602d31338eab930660d4636",
         "timestamp": "2026-06-03T00:00:00Z"
       },
       {
