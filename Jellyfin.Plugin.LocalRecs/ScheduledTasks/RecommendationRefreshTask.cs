@@ -153,24 +153,18 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
                 await TriggerAndAwaitLibraryScanAsync(cancellationToken).ConfigureAwait(false);
 
-                var staleReport = string.Empty;
                 try
                 {
-                    staleReport = _virtualLibraryManager.BuildStaleItemsReport(
+                    var staleReport = _virtualLibraryManager.BuildStaleItemsReport(
                         users.Select(u => (u.Id, u.Username ?? "Unknown")),
                         userRecommendations,
                         leavingSoonState,
                         allItems);
+                    _diagnosticLogService.Append(staleReport);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to build stale items report");
-                }
-
-                if (!string.IsNullOrEmpty(staleReport))
-                {
-                    _diagnosticLogService.Append(staleReport);
-                    _logger.LogWarning("Stale library entries detected after sync + scan; see diagnostic log for details");
                 }
 
                 progress?.Report(95);

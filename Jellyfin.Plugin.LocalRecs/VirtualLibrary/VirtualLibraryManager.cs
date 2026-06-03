@@ -234,7 +234,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
             var virtualFolders = _libraryManager.GetVirtualFolders();
             var sb = new StringBuilder();
-            var anyStale = false;
+            var staleSb = new StringBuilder();
 
             void CheckLibrary(string libraryPath, string label, HashSet<Guid> validIds, BaseItemKind itemKind)
             {
@@ -244,6 +244,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
                 if (folder == null || string.IsNullOrEmpty(folder.ItemId) || !Guid.TryParse(folder.ItemId, out var folderId))
                 {
+                    sb.AppendLine($"  {label}: folder not registered in Jellyfin");
                     return;
                 }
 
@@ -255,17 +256,16 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 });
 
                 var staleItems = indexedItems.Where(item => !validIds.Contains(item.Id)).ToList();
-                if (staleItems.Count == 0)
-                {
-                    return;
-                }
+                sb.AppendLine($"  {label}: folder={folderId}, indexed={indexedItems.Count}, valid={validIds.Count}, stale={staleItems.Count}");
 
-                anyStale = true;
-                sb.AppendLine($"  {label} ({staleItems.Count}):");
-                foreach (var staleItem in staleItems)
+                if (staleItems.Count > 0)
                 {
-                    var year = staleItem.ProductionYear.HasValue ? $" ({staleItem.ProductionYear})" : string.Empty;
-                    sb.AppendLine($"    - {staleItem.Name ?? staleItem.Id.ToString()}{year}");
+                    staleSb.AppendLine($"  {label} ({staleItems.Count} stale):");
+                    foreach (var staleItem in staleItems)
+                    {
+                        var year = staleItem.ProductionYear.HasValue ? $" ({staleItem.ProductionYear})" : string.Empty;
+                        staleSb.AppendLine($"    - {staleItem.Name ?? staleItem.Id.ToString()}{year}");
+                    }
                 }
             }
 
@@ -296,13 +296,23 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 CheckLibrary(RemovalCandidatesMoviesPath, "Removal Candidates — Movies", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToHashSet(), BaseItemKind.Movie);
                 CheckLibrary(RemovalCandidatesTvPath, "Removal Candidates — TV", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToHashSet(), BaseItemKind.Series);
             }
-
-            if (!anyStale)
+            else
             {
-                return string.Empty;
+                sb.AppendLine("  Leaving Soon: disabled");
             }
 
-            return "\nPOST-SYNC: STALE JELLYFIN DB ENTRIES\n  (still indexed after sync + library scan)\n" + sb;
+            var report = new StringBuilder();
+            report.AppendLine();
+            report.AppendLine("POST-SYNC: DB STALE CHECK");
+            report.AppendLine($"  Virtual folders known to Jellyfin: {virtualFolders.Count}");
+            report.Append(sb);
+            if (staleSb.Length > 0)
+            {
+                report.AppendLine("  --- STALE ITEMS (still indexed after sync + scan) ---");
+                report.Append(staleSb);
+            }
+
+            return report.ToString();
         }
 
         private static IEnumerable<Guid> FilterIds(
