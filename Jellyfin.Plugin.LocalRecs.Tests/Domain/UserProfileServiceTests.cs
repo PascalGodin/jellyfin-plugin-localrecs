@@ -29,6 +29,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         private readonly PluginConfiguration _config;
         private readonly Guid _testUserId;
         private readonly User _testUser;
+        private readonly List<BaseItem> _allPlayedEpisodes;
 
         public UserProfileServiceTests()
         {
@@ -53,6 +54,13 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
 
             // Setup user manager to return test user
             _mockUserManager.Setup(m => m.GetUserById(_testUserId)).Returns(_testUser);
+
+            // Default mock for the bulk played-episodes query used by BuildSeriesLastPlayedMap.
+            // Tests populate _allPlayedEpisodes via SetupSeriesWithWatchedEpisode before calling BuildUserProfile.
+            _allPlayedEpisodes = new List<BaseItem>();
+            _mockLibraryManager
+                .Setup(m => m.GetItemList(It.IsAny<InternalItemsQuery>()))
+                .Returns(() => _allPlayedEpisodes);
         }
 
         [Fact]
@@ -454,11 +462,15 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             };
             _mockUserDataManager.Setup(m => m.GetUserData(_testUser, series)).Returns(seriesUserData);
 
-            var episode = new Episode { Id = Guid.NewGuid(), Name = seriesMeta.Name + " S01E01" };
-            _mockLibraryManager
-                .Setup(m => m.GetItemList(It.Is<InternalItemsQuery>(q =>
-                    q.AncestorIds != null && q.AncestorIds.Contains(seriesMeta.Id))))
-                .Returns(new List<BaseItem> { episode });
+            // Add the episode to the shared list returned by the bulk GetItemList query.
+            // SeriesId links it back to its parent series so BuildSeriesLastPlayedMap can group by series.
+            var episode = new Episode
+            {
+                Id = Guid.NewGuid(),
+                Name = seriesMeta.Name + " S01E01",
+                SeriesId = seriesMeta.Id
+            };
+            _allPlayedEpisodes.Add(episode);
 
             var episodeUserData = new UserItemData
             {
@@ -481,10 +493,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             };
             _mockUserDataManager.Setup(m => m.GetUserData(_testUser, series)).Returns(seriesUserData);
 
-            _mockLibraryManager
-                .Setup(m => m.GetItemList(It.Is<InternalItemsQuery>(q =>
-                    q.AncestorIds != null && q.AncestorIds.Contains(seriesMeta.Id))))
-                .Returns(new List<BaseItem>());
+            // No episode added to _allPlayedEpisodes — TryGetValue returns false and the series is excluded.
         }
     }
 }
