@@ -134,6 +134,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             var itemIdSet = availableItemIds.ToHashSet();
 
+            // Single bulk query for all played episodes replaces one DB query per series.
+            var seriesLastPlayedMap = BuildSeriesLastPlayedMap(user);
+
             foreach (var itemId in itemIdSet)
             {
                 var item = _libraryManager.GetItemById(itemId);
@@ -154,13 +157,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 DateTime lastPlayedDate;
                 if (item is Series series)
                 {
-                    var seriesLastPlayed = GetLastWatchedEpisodeDate(series, user);
-                    if (seriesLastPlayed == null)
+                    if (!seriesLastPlayedMap.TryGetValue(series.Id, out lastPlayedDate))
                     {
                         continue;
                     }
-
-                    lastPlayedDate = seriesLastPlayed.Value;
                 }
                 else if (!userData.Played)
                 {
@@ -186,28 +186,39 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         }
 
         /// <summary>
-        /// Returns the most recent LastPlayedDate across watched episodes of a series,
-        /// or null if no episodes have been watched.
+        /// Builds a map of series ID to the most recent watched episode date for a user.
+        /// Uses a single bulk query ordered newest-first; the first episode seen per series
+        /// is the most recent, so subsequent episodes for that series are skipped.
         /// </summary>
-        private DateTime? GetLastWatchedEpisodeDate(Series series, Jellyfin.Database.Implementations.Entities.User user)
+        private Dictionary<Guid, DateTime> BuildSeriesLastPlayedMap(Jellyfin.Database.Implementations.Entities.User user)
         {
-            var result = _libraryManager.GetItemList(new InternalItemsQuery(user)
+            var playedEpisodes = _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 IncludeItemTypes = new[] { BaseItemKind.Episode },
-                AncestorIds = new[] { series.Id },
                 IsPlayed = true,
                 Recursive = true,
-                OrderBy = new[] { (ItemSortBy.DatePlayed, Jellyfin.Database.Implementations.Enums.SortOrder.Descending) },
-                Limit = 1
+                OrderBy = new[] { (ItemSortBy.DatePlayed, Jellyfin.Database.Implementations.Enums.SortOrder.Descending) }
             });
 
-            if (result.Count == 0)
+            var map = new Dictionary<Guid, DateTime>();
+            foreach (var episode in playedEpisodes)
             {
-                return null;
+                if (episode is not Episode ep)
+                {
+                    continue;
+                }
+
+                var seriesId = ep.SeriesId;
+                if (seriesId == Guid.Empty || map.ContainsKey(seriesId))
+                {
+                    continue;
+                }
+
+                var epData = _userDataManager.GetUserData(user, episode);
+                map[seriesId] = epData?.LastPlayedDate ?? DateTime.UtcNow;
             }
 
-            var epData = _userDataManager.GetUserData(user, result[0]);
-            return epData?.LastPlayedDate ?? DateTime.UtcNow;
+            return map;
         }
 
         /// <summary>
