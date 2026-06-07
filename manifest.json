@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.12",
+        "changelog": "Leaving Soon: replace in-progress blanket protection with effective-age tracking\n- Previously, any item with PlaybackPositionTicks > 0 and not yet marked Played was permanently excluded from Leaving Soon; an abandoned partial watch from years ago would shield the title indefinitely\n- New behavior: in-progress items are no longer gated from Leaving Soon; instead their LastPlayedDate is fed into watchStatus as LatestWatchDate, which the effective-age formula already uses to clamp item age; a title started last week stays young (<minAgeDays) and is naturally excluded; a title barely touched years ago becomes eligible as expected\n- Favorited items remain permanently protected (no change)\n- GetProtectedItemStatuses now returns (Id, IsFavorite, DateTime? LastPlayedDate) instead of (Id, IsFavorite, bool IsInProgress)\n- watchStatus tuple simplified to (DateTime? LatestWatchDate, bool IsAnyFavorite); IsAnyInProgress removed throughout\n- Diagnostic log label updated from 'Favorited/active' to 'Favorited'",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.12/jellyfin-plugin-localrecs-v0.6.1.12.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-07T00:00:00Z"
+      },
+      {
         "version": "0.6.1.11",
         "changelog": "Leaving Soon: fix protection check for series favorited in virtual Leaving Soon library\n- When a user favorites a series in the virtual Leaving Soon library, the flag is stored on the virtual series item (a folder, not a symlink); PlayStatusSyncService cannot resolve folders via ResolveSymlinkTarget, so the sync to the actual series is silently skipped and the series remains unprotected\n- Fix: after building watchStatus from watch records and per-user protected statuses, scan the virtual Leaving Soon libraries (all four paths: movies, tv, removal-movies, removal-tv); for each episode symlink, resolve it to the actual episode, get the actual series ID, look up the virtual series item, and check all users' favorite/in-progress flags on both the virtual episode and virtual series; merge these protection flags into watchStatus before LeavingSoonService.Refresh runs\n- Movies in the virtual library already synced correctly (they are symlinks); this fix also provides belt-and-suspenders coverage for movies in case the 5s debounce sync has not yet fired when the task runs",
         "targetAbi": "10.11.9.0",

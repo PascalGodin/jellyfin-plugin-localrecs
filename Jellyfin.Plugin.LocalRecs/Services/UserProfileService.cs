@@ -117,22 +117,22 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <summary>
         /// Returns the protected status of items that are favorited or in-progress for the given user.
         /// Only items where at least one flag is true are included.
-        /// Used by Leaving Soon to gate items that should never be flagged for removal regardless of taste score.
-        /// Note: in-progress detection for series requires episode-level data and is not handled here;
-        /// series with any fully-played episodes are already captured via watch records.
+        /// Used by Leaving Soon: favorited items are permanently gated; in-progress items are not gated
+        /// but their LastPlayedDate is returned so the effective-age calculation can use the real last-touched
+        /// timestamp rather than the item's library-add date.
         /// </summary>
         /// <param name="userId">The user identifier.</param>
         /// <param name="candidateItemIds">Item IDs to check (from embeddings).</param>
-        /// <returns>Per-item protected flags for items that are favorited or in-progress.</returns>
-        public IReadOnlyList<(Guid Id, bool IsFavorite, bool IsInProgress)> GetProtectedItemStatuses(Guid userId, IEnumerable<Guid> candidateItemIds)
+        /// <returns>Per-item status: IsFavorite flag and LastPlayedDate (set when in-progress, null otherwise).</returns>
+        public IReadOnlyList<(Guid Id, bool IsFavorite, DateTime? LastPlayedDate)> GetProtectedItemStatuses(Guid userId, IEnumerable<Guid> candidateItemIds)
         {
             var user = _userManager.GetUserById(userId);
             if (user == null)
             {
-                return Array.Empty<(Guid, bool, bool)>();
+                return Array.Empty<(Guid, bool, DateTime?)>();
             }
 
-            var result = new List<(Guid, bool, bool)>();
+            var result = new List<(Guid, bool, DateTime?)>();
             foreach (var itemId in candidateItemIds)
             {
                 var item = _libraryManager.GetItemById(itemId);
@@ -148,11 +148,13 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
 
                 var isFavorite = userData.IsFavorite;
-                var isInProgress = userData.PlaybackPositionTicks > 0 && !userData.Played;
+                var lastPlayedDate = (userData.PlaybackPositionTicks > 0 && !userData.Played)
+                    ? userData.LastPlayedDate
+                    : null;
 
-                if (isFavorite || isInProgress)
+                if (isFavorite || lastPlayedDate.HasValue)
                 {
-                    result.Add((itemId, isFavorite, isInProgress));
+                    result.Add((itemId, isFavorite, lastPlayedDate));
                 }
             }
 
@@ -167,8 +169,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// </summary>
         /// <param name="userIds">User IDs to check.</param>
         /// <param name="leavingSoonPaths">Filesystem paths of the Leaving Soon virtual libraries to scan.</param>
-        /// <returns>Per-actual-item protection flags OR-aggregated across all users.</returns>
-        public IReadOnlyList<(Guid ActualItemId, bool IsFavorite, bool IsInProgress)> GetVirtualLeavingSoonProtectedStatuses(
+        /// <returns>Actual item IDs where any user has the virtual item favorited, OR-aggregated across all users.</returns>
+        public IReadOnlyList<(Guid ActualItemId, bool IsFavorite)> GetVirtualLeavingSoonProtectedStatuses(
             IReadOnlyList<Guid> userIds,
             IEnumerable<string> leavingSoonPaths)
         {
@@ -180,10 +182,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (users.Count == 0)
             {
-                return Array.Empty<(Guid, bool, bool)>();
+                return Array.Empty<(Guid, bool)>();
             }
 
-            var result = new Dictionary<Guid, (bool IsFavorite, bool IsInProgress)>();
+            var result = new HashSet<Guid>();
 
             foreach (var libraryPath in leavingSoonPaths)
             {
@@ -231,7 +233,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         }
 
                         var isFavorite = false;
-                        var isInProgress = false;
 
                         foreach (var user in users)
                         {
@@ -239,10 +240,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             if (virtualUserData != null)
                             {
                                 isFavorite |= virtualUserData.IsFavorite;
-                                isInProgress |= virtualUserData.PlaybackPositionTicks > 0 && !virtualUserData.Played;
                             }
 
-                            if (virtualSeriesItem != null)
+                            if (!isFavorite && virtualSeriesItem != null)
                             {
                                 var seriesUserData = _userDataManager.GetUserData(user, virtualSeriesItem);
                                 if (seriesUserData != null)
@@ -252,16 +252,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             }
                         }
 
-                        if (isFavorite || isInProgress)
+                        if (isFavorite)
                         {
-                            if (result.TryGetValue(actualItemId, out var existing))
-                            {
-                                result[actualItemId] = (existing.IsFavorite || isFavorite, existing.IsInProgress || isInProgress);
-                            }
-                            else
-                            {
-                                result[actualItemId] = (isFavorite, isInProgress);
-                            }
+                            result.Add(actualItemId);
                         }
                     }
                     catch (Exception ex)
@@ -271,9 +264,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            return result
-                .Select(kvp => (kvp.Key, kvp.Value.IsFavorite, kvp.Value.IsInProgress))
-                .ToList();
+            return result.Select(id => (id, true)).ToList();
         }
 
         /// <summary>

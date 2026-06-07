@@ -189,7 +189,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist,
                 TimeSpan UserDuration)>();
 
-            var watchStatus = new Dictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite, bool IsAnyInProgress)>();
+            var watchStatus = new Dictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)>();
 
             foreach (var userId in userIds)
             {
@@ -207,26 +207,31 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         var newLatest = (!existing.LatestWatchDate.HasValue || (record.LastPlayedDate > existing.LatestWatchDate.Value))
                             ? (DateTime?)record.LastPlayedDate
                             : existing.LatestWatchDate;
-                        watchStatus[record.ItemId] = (newLatest, existing.IsAnyFavorite || record.IsFavorite, existing.IsAnyInProgress);
+                        watchStatus[record.ItemId] = (newLatest, existing.IsAnyFavorite || record.IsFavorite);
                     }
                     else
                     {
-                        watchStatus[record.ItemId] = (record.LastPlayedDate, record.IsFavorite, false);
+                        watchStatus[record.ItemId] = (record.LastPlayedDate, record.IsFavorite);
                     }
                 }
 
                 // Played items are captured above. Unplayed items that are favorited or in-progress
-                // are absent from watchRecords, so their protection flags are not yet in watchStatus.
+                // are absent from watchRecords. Favorites are gated; in-progress items are not gated
+                // but their LastPlayedDate feeds the effective-age calculation so the min-age threshold
+                // naturally protects recently-started titles without permanently shielding abandoned ones.
                 var protectedStatuses = _userProfileService.GetProtectedItemStatuses(userId, embeddings.Keys);
-                foreach (var (itemId, isFavorite, isInProgress) in protectedStatuses)
+                foreach (var (itemId, isFavorite, lastPlayedDate) in protectedStatuses)
                 {
                     if (watchStatus.TryGetValue(itemId, out var ws))
                     {
-                        watchStatus[itemId] = (ws.LatestWatchDate, ws.IsAnyFavorite || isFavorite, ws.IsAnyInProgress || isInProgress);
+                        var newLatest = lastPlayedDate.HasValue && (!ws.LatestWatchDate.HasValue || lastPlayedDate.Value > ws.LatestWatchDate.Value)
+                            ? lastPlayedDate
+                            : ws.LatestWatchDate;
+                        watchStatus[itemId] = (newLatest, ws.IsAnyFavorite || isFavorite);
                     }
                     else
                     {
-                        watchStatus[itemId] = (null, isFavorite, isInProgress);
+                        watchStatus[itemId] = (lastPlayedDate, isFavorite);
                     }
                 }
 
@@ -239,7 +244,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             // Virtual Leaving Soon libraries may contain items that users have favorited directly in those
             // libraries. Series items are folders (not symlinks), so PlayStatusSyncService cannot resolve them
             // and the sync to the source item is silently skipped. Scan the virtual libraries here to catch
-            // any protection flags that were not synced before the Leaving Soon gate runs.
+            // any favorite flags that were not synced before the Leaving Soon gate runs.
             if (config.LeavingSoonEnabled)
             {
                 var virtualProtected = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
@@ -251,15 +256,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         _virtualLibraryManager.RemovalCandidatesMoviesPath,
                         _virtualLibraryManager.RemovalCandidatesTvPath,
                     });
-                foreach (var (actualItemId, isFavorite, isInProgress) in virtualProtected)
+                foreach (var (actualItemId, isFavorite) in virtualProtected)
                 {
                     if (watchStatus.TryGetValue(actualItemId, out var ws))
                     {
-                        watchStatus[actualItemId] = (ws.LatestWatchDate, ws.IsAnyFavorite || isFavorite, ws.IsAnyInProgress || isInProgress);
+                        watchStatus[actualItemId] = (ws.LatestWatchDate, ws.IsAnyFavorite || isFavorite);
                     }
                     else
                     {
-                        watchStatus[actualItemId] = (null, isFavorite, isInProgress);
+                        watchStatus[actualItemId] = (null, isFavorite);
                     }
                 }
             }
@@ -710,7 +715,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     sb.AppendLine($"      Already removal  : {leavingSoonDiagnostics.SkippedAlreadyRemoval}");
                     sb.AppendLine($"      No metadata      : {leavingSoonDiagnostics.SkippedNoMetadata}");
                     sb.AppendLine($"      No embedding     : {leavingSoonDiagnostics.SkippedNoEmbedding}");
-                    sb.AppendLine($"      Favorited/active : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
+                    sb.AppendLine($"      Favorited        : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
                     sb.AppendLine($"      Too young (<{config.LeavingSoonMinAgeDays}d): {leavingSoonDiagnostics.SkippedTooYoung}");
                     sb.AppendLine($"      Not found        : {leavingSoonDiagnostics.SkippedNotFound}");
                     sb.AppendLine($"      Unknown type     : {leavingSoonDiagnostics.SkippedUnknownType}");
