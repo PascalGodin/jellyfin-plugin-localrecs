@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.LocalRecs.Configuration;
 using Jellyfin.Plugin.LocalRecs.Models;
+using Jellyfin.Plugin.LocalRecs.VirtualLibrary;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
@@ -26,6 +27,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         private readonly DiagnosticLogService _diagnosticLogService;
         private readonly LeavingSoonService _leavingSoonService;
         private readonly IUserManager _userManager;
+        private readonly VirtualLibraryManager _virtualLibraryManager;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationRefreshService"/> class.
@@ -39,6 +41,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="diagnosticLogService">Diagnostic log service.</param>
         /// <param name="leavingSoonService">Leaving Soon scoring service.</param>
         /// <param name="userManager">User manager for resolving usernames.</param>
+        /// <param name="virtualLibraryManager">Virtual library manager for Leaving Soon paths.</param>
         public RecommendationRefreshService(
             ILogger<RecommendationRefreshService> logger,
             LibraryAnalysisService libraryAnalysisService,
@@ -48,7 +51,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             RecommendationEngine recommendationEngine,
             DiagnosticLogService diagnosticLogService,
             LeavingSoonService leavingSoonService,
-            IUserManager userManager)
+            IUserManager userManager,
+            VirtualLibraryManager virtualLibraryManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _libraryAnalysisService = libraryAnalysisService ?? throw new ArgumentNullException(nameof(libraryAnalysisService));
@@ -59,6 +63,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _diagnosticLogService = diagnosticLogService ?? throw new ArgumentNullException(nameof(diagnosticLogService));
             _leavingSoonService = leavingSoonService ?? throw new ArgumentNullException(nameof(leavingSoonService));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _virtualLibraryManager = virtualLibraryManager ?? throw new ArgumentNullException(nameof(virtualLibraryManager));
         }
 
         /// <summary>
@@ -230,6 +235,34 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
 
             _logger.LogInformation("Successfully generated recommendations for {Count}/{Total} users", results.Count, userIds.Count);
+
+            // Virtual Leaving Soon libraries may contain items that users have favorited directly in those
+            // libraries. Series items are folders (not symlinks), so PlayStatusSyncService cannot resolve them
+            // and the sync to the source item is silently skipped. Scan the virtual libraries here to catch
+            // any protection flags that were not synced before the Leaving Soon gate runs.
+            if (config.LeavingSoonEnabled)
+            {
+                var virtualProtected = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
+                    userIds,
+                    new[]
+                    {
+                        _virtualLibraryManager.LeavingSoonMoviesPath,
+                        _virtualLibraryManager.LeavingSoonTvPath,
+                        _virtualLibraryManager.RemovalCandidatesMoviesPath,
+                        _virtualLibraryManager.RemovalCandidatesTvPath,
+                    });
+                foreach (var (actualItemId, isFavorite, isInProgress) in virtualProtected)
+                {
+                    if (watchStatus.TryGetValue(actualItemId, out var ws))
+                    {
+                        watchStatus[actualItemId] = (ws.LatestWatchDate, ws.IsAnyFavorite || isFavorite, ws.IsAnyInProgress || isInProgress);
+                    }
+                    else
+                    {
+                        watchStatus[actualItemId] = (null, isFavorite, isInProgress);
+                    }
+                }
+            }
 
             // Run Leaving Soon scoring using the profiles already computed above
             LeavingSoonState? leavingSoonState = null;

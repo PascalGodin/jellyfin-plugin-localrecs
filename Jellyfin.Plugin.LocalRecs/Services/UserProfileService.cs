@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.LocalRecs.Configuration;
@@ -156,6 +157,123 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Checks virtual Leaving Soon library items for protection flags and maps them back to actual item IDs.
+        /// Handles the case where a user favorites a series in the virtual Leaving Soon library but the flag was
+        /// not synced to the source item. Series items are folders (not symlinks), so PlayStatusSyncService
+        /// cannot resolve them and the sync is silently skipped.
+        /// </summary>
+        /// <param name="userIds">User IDs to check.</param>
+        /// <param name="leavingSoonPaths">Filesystem paths of the Leaving Soon virtual libraries to scan.</param>
+        /// <returns>Per-actual-item protection flags OR-aggregated across all users.</returns>
+        public IReadOnlyList<(Guid ActualItemId, bool IsFavorite, bool IsInProgress)> GetVirtualLeavingSoonProtectedStatuses(
+            IReadOnlyList<Guid> userIds,
+            IEnumerable<string> leavingSoonPaths)
+        {
+            var users = userIds
+                .Select(id => _userManager.GetUserById(id))
+                .Where(u => u != null)
+                .Select(u => u!)
+                .ToList();
+
+            if (users.Count == 0)
+            {
+                return Array.Empty<(Guid, bool, bool)>();
+            }
+
+            var result = new Dictionary<Guid, (bool IsFavorite, bool IsInProgress)>();
+
+            foreach (var libraryPath in leavingSoonPaths)
+            {
+                if (!Directory.Exists(libraryPath))
+                {
+                    continue;
+                }
+
+                foreach (var linkPath in Directory.EnumerateFiles(libraryPath, "*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var target = new FileInfo(linkPath).ResolveLinkTarget(returnFinalTarget: true);
+                        if (target == null)
+                        {
+                            continue;
+                        }
+
+                        var sourceItem = _libraryManager.FindByPath(target.FullName, isFolder: false);
+                        var virtualItem = _libraryManager.FindByPath(linkPath, isFolder: false);
+                        if (sourceItem == null || virtualItem == null)
+                        {
+                            continue;
+                        }
+
+                        Guid actualItemId;
+                        BaseItem? virtualSeriesItem = null;
+
+                        if (virtualItem is Episode virtualEpisode && sourceItem is Episode sourceEpisode)
+                        {
+                            actualItemId = sourceEpisode.SeriesId;
+                            if (virtualEpisode.SeriesId != Guid.Empty)
+                            {
+                                virtualSeriesItem = _libraryManager.GetItemById(virtualEpisode.SeriesId);
+                            }
+                        }
+                        else
+                        {
+                            actualItemId = sourceItem.Id;
+                        }
+
+                        if (actualItemId == Guid.Empty)
+                        {
+                            continue;
+                        }
+
+                        var isFavorite = false;
+                        var isInProgress = false;
+
+                        foreach (var user in users)
+                        {
+                            var virtualUserData = _userDataManager.GetUserData(user, virtualItem);
+                            if (virtualUserData != null)
+                            {
+                                isFavorite |= virtualUserData.IsFavorite;
+                                isInProgress |= virtualUserData.PlaybackPositionTicks > 0 && !virtualUserData.Played;
+                            }
+
+                            if (virtualSeriesItem != null)
+                            {
+                                var seriesUserData = _userDataManager.GetUserData(user, virtualSeriesItem);
+                                if (seriesUserData != null)
+                                {
+                                    isFavorite |= seriesUserData.IsFavorite;
+                                }
+                            }
+                        }
+
+                        if (isFavorite || isInProgress)
+                        {
+                            if (result.TryGetValue(actualItemId, out var existing))
+                            {
+                                result[actualItemId] = (existing.IsFavorite || isFavorite, existing.IsInProgress || isInProgress);
+                            }
+                            else
+                            {
+                                result[actualItemId] = (isFavorite, isInProgress);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to check virtual protection status for: {Path}", linkPath);
+                    }
+                }
+            }
+
+            return result
+                .Select(kvp => (kvp.Key, kvp.Value.IsFavorite, kvp.Value.IsInProgress))
+                .ToList();
         }
 
         /// <summary>
