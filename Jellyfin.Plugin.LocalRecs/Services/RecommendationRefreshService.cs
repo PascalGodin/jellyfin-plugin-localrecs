@@ -184,7 +184,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 ScoreDistribution MovieScoreDist, ScoreDistribution TvScoreDist,
                 TimeSpan UserDuration)>();
 
-            var watchStatus = new Dictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)>();
+            var watchStatus = new Dictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite, bool IsAnyInProgress)>();
 
             foreach (var userId in userIds)
             {
@@ -202,11 +202,26 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         var newLatest = (!existing.LatestWatchDate.HasValue || (record.LastPlayedDate > existing.LatestWatchDate.Value))
                             ? (DateTime?)record.LastPlayedDate
                             : existing.LatestWatchDate;
-                        watchStatus[record.ItemId] = (newLatest, existing.IsAnyFavorite || record.IsFavorite);
+                        watchStatus[record.ItemId] = (newLatest, existing.IsAnyFavorite || record.IsFavorite, existing.IsAnyInProgress);
                     }
                     else
                     {
-                        watchStatus[record.ItemId] = (record.LastPlayedDate, record.IsFavorite);
+                        watchStatus[record.ItemId] = (record.LastPlayedDate, record.IsFavorite, false);
+                    }
+                }
+
+                // Played items are captured above. Unplayed items that are favorited or in-progress
+                // are absent from watchRecords, so their protection flags are not yet in watchStatus.
+                var protectedStatuses = _userProfileService.GetProtectedItemStatuses(userId, embeddings.Keys);
+                foreach (var (itemId, isFavorite, isInProgress) in protectedStatuses)
+                {
+                    if (watchStatus.TryGetValue(itemId, out var ws))
+                    {
+                        watchStatus[itemId] = (ws.LatestWatchDate, ws.IsAnyFavorite || isFavorite, ws.IsAnyInProgress || isInProgress);
+                    }
+                    else
+                    {
+                        watchStatus[itemId] = (null, isFavorite, isInProgress);
                     }
                 }
 

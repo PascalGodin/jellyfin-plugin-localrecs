@@ -114,6 +114,51 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         }
 
         /// <summary>
+        /// Returns the protected status of items that are favorited or in-progress for the given user.
+        /// Only items where at least one flag is true are included.
+        /// Used by Leaving Soon to gate items that should never be flagged for removal regardless of taste score.
+        /// Note: in-progress detection for series requires episode-level data and is not handled here;
+        /// series with any fully-played episodes are already captured via watch records.
+        /// </summary>
+        /// <param name="userId">The user identifier.</param>
+        /// <param name="candidateItemIds">Item IDs to check (from embeddings).</param>
+        /// <returns>Per-item protected flags for items that are favorited or in-progress.</returns>
+        public IReadOnlyList<(Guid Id, bool IsFavorite, bool IsInProgress)> GetProtectedItemStatuses(Guid userId, IEnumerable<Guid> candidateItemIds)
+        {
+            var user = _userManager.GetUserById(userId);
+            if (user == null)
+            {
+                return Array.Empty<(Guid, bool, bool)>();
+            }
+
+            var result = new List<(Guid, bool, bool)>();
+            foreach (var itemId in candidateItemIds)
+            {
+                var item = _libraryManager.GetItemById(itemId);
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var userData = _userDataManager.GetUserData(user, item);
+                if (userData == null)
+                {
+                    continue;
+                }
+
+                var isFavorite = userData.IsFavorite;
+                var isInProgress = userData.PlaybackPositionTicks > 0 && !userData.Played;
+
+                if (isFavorite || isInProgress)
+                {
+                    result.Add((itemId, isFavorite, isInProgress));
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Gets watch records for a user.
         /// For movies, includes items that have been fully watched (Played = true).
         /// For series, includes items with any watched episodes to capture partial engagement.

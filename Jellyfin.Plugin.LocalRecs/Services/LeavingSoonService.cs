@@ -57,7 +57,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
-            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite, bool IsAnyInProgress)> watchStatus,
             PluginConfiguration config,
             CancellationToken cancellationToken)
         {
@@ -145,7 +145,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyList<MediaItemMetadata> allItems,
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
-            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite, bool IsAnyInProgress)> watchStatus,
             PluginConfiguration config,
             TimeSpan minAge,
             DateTime now)
@@ -182,7 +182,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 watchStatus.TryGetValue(meta.Id, out var ws);
 
-                if (ws.IsAnyFavorite)
+                if (ws.IsAnyFavorite || ws.IsAnyInProgress)
                 {
                     diag.SkippedAlwaysSafe++;
                     continue;

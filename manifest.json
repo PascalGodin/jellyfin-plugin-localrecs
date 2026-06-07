@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.10",
+        "changelog": "Leaving Soon: protect favorited and in-progress items from flagging\n- Favorited items that have never been played were invisible to Leaving Soon discovery because watchStatus is built from watch records (played items only); they could be flagged and eventually queued for removal\n- Fix: query each user's favorited and in-progress items in a single pass after watch records are processed, and merge IsAnyFavorite / IsAnyInProgress flags into watchStatus\n- In-progress movies (PlaybackPositionTicks > 0, not yet played) are now also protected; in-progress series detection deferred (series with any fully-played episodes are already protected via watch records)\n- LeavingSoonService.Discover now skips items where IsAnyFavorite || IsAnyInProgress, matching the existing 'Favorited/active' label in the diagnostic log",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.10/jellyfin-plugin-localrecs-v0.6.1.10.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-06T00:00:00Z"
+      },
+      {
         "version": "0.6.1.9",
         "changelog": "Performance: replace per-series DB queries with single bulk query in watch history\n- GetLastWatchedEpisodeDate ran one GetItemList DB query per series per user (O(series \u00d7 users) total)\n- Replaced with BuildSeriesLastPlayedMap: one bulk query for all played episodes per user, ordered newest-first\n- In-memory dictionary lookup (seriesId \u2192 last played date) replaces the per-series DB call\n- No change to recommendation output; identical LastPlayedDate values are produced\n- Reduces DB query count from ~250+ per user to 1 per user for the watch history phase",
         "targetAbi": "10.11.9.0",
