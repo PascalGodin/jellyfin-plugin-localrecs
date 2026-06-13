@@ -12,7 +12,7 @@
         "changelog": "Leaving Soon: fix IsFavorite not syncing from virtual series to actual series\n- When a user favorites a series in the Leaving Soon virtual library, OnUserDataSaved fires for the virtual series folder; SyncPlayStatusToSource called ResolveLinkTarget on the folder path, which returns null for non-symlinks, and returned without syncing\n- Fix: when symlink resolution fails and the item path is a directory, enumerate episode symlinks inside the folder, resolve the first one to the actual episode, look up the actual series via SeriesId, and sync IsFavorite to the actual series\n- Only IsFavorite is synced at the series level; play state (Played, PlayCount, etc.) remains episode-driven\n- Re-entrancy protection and the existing 5s debounce queue are reused for the new path\n- This fix covers both virtual Leaving Soon libraries and per-user recommendation libraries (series are folders in both)",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.13/jellyfin-plugin-localrecs-v0.6.1.13.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "85885fce468c1a55ba1ab33939b9c916",
         "timestamp": "2026-06-13T00:00:00Z"
       },
       {
