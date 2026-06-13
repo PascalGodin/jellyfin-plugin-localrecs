@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using Microsoft.Extensions.Logging;
 
@@ -538,6 +539,83 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             }
         }
 
+        /// <summary>
+        /// Syncs the IsFavorite flag from a virtual series folder to the corresponding actual series,
+        /// by resolving one of the episode symlinks inside the folder.
+        /// </summary>
+        private void TrySyncSeriesFavoriteToSource(Guid userId, BaseItem virtualSeriesItem, MediaBrowser.Controller.Entities.UserItemData virtualUserData)
+        {
+            try
+            {
+                foreach (var filePath in Directory.EnumerateFiles(virtualSeriesItem.Path, "*", SearchOption.AllDirectories))
+                {
+                    var target = ResolveSymlinkTarget(filePath);
+                    if (string.IsNullOrEmpty(target))
+                    {
+                        continue;
+                    }
+
+                    var sourceEpisode = _libraryManager.FindByPath(target, isFolder: false) as Episode;
+                    if (sourceEpisode == null || sourceEpisode.SeriesId == Guid.Empty)
+                    {
+                        continue;
+                    }
+
+                    var user = _userManager.GetUserById(userId);
+                    if (user == null)
+                    {
+                        return;
+                    }
+
+                    var actualSeries = _libraryManager.GetItemById(sourceEpisode.SeriesId);
+                    if (actualSeries == null)
+                    {
+                        return;
+                    }
+
+                    var sourceSeriesData = _userDataManager.GetUserData(user, actualSeries);
+                    if (sourceSeriesData == null || sourceSeriesData.IsFavorite == virtualUserData.IsFavorite)
+                    {
+                        return;
+                    }
+
+                    var syncKey = (userId, actualSeries.Id);
+                    if (!_inProgressSyncs.TryAdd(syncKey, 0))
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        sourceSeriesData.IsFavorite = virtualUserData.IsFavorite;
+                        _userDataManager.SaveUserData(
+                            user,
+                            actualSeries,
+                            sourceSeriesData,
+                            MediaBrowser.Model.Entities.UserDataSaveReason.UpdateUserRating,
+                            CancellationToken.None);
+
+                        _logger.LogInformation(
+                            "Synced series favorite ({IsFavorite}) from virtual series '{VirtualName}' to actual series '{ActualName}' for user {UserId}",
+                            virtualUserData.IsFavorite,
+                            virtualSeriesItem.Name,
+                            actualSeries.Name,
+                            userId);
+                    }
+                    finally
+                    {
+                        _inProgressSyncs.TryRemove(syncKey, out _);
+                    }
+
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sync series favorite for virtual series: {Path}", virtualSeriesItem.Path);
+            }
+        }
+
         private void OnUserDataSaved(object? sender, UserDataSaveEventArgs e)
         {
             try
@@ -609,7 +687,16 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 var sourcePath = ResolveSymlinkTarget(virtualItem.Path);
                 if (string.IsNullOrEmpty(sourcePath))
                 {
-                    _logger.LogWarning("Could not resolve symlink target: {Path}", virtualItem.Path);
+                    // Series virtual items are regular folders (not symlinks); resolve via episode symlinks.
+                    if (Directory.Exists(virtualItem.Path))
+                    {
+                        TrySyncSeriesFavoriteToSource(userId, virtualItem, virtualUserData);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not resolve symlink target: {Path}", virtualItem.Path);
+                    }
+
                     return;
                 }
 
