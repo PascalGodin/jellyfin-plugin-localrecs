@@ -478,13 +478,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             }
         }
 
-        /// <summary>
-        /// Immediately processes all pending virtual-to-source sync operations without waiting for the debounce timer.
-        /// Call this at the start of the recommendation task so every IsFavorite update written to a virtual library
-        /// item (including series folders) is committed to the actual library before scoring and rebuilding begin.
-        /// </summary>
-        public void Flush() => FlushQueue();
-
         private void FlushQueue()
         {
             if (_disposed)

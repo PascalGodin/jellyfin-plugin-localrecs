@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.LocalRecs.Configuration;
 using Jellyfin.Plugin.LocalRecs.Models;
@@ -164,10 +163,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>
         /// Checks virtual Leaving Soon library items for protection flags and maps them back to actual item IDs.
-        /// When a virtual series is favorited, also syncs IsFavorite to the actual series as a fallback for the
-        /// case where PlayStatusSyncService.Flush() could not complete the sync (e.g. an internal failure during
-        /// the flush that left the actual item unfavorited). The primary sync path is the explicit Flush() call
-        /// at the start of the recommendation task; this write is a no-op when Flush() already succeeded.
         /// </summary>
         /// <param name="userIds">User IDs to check.</param>
         /// <param name="leavingSoonPaths">Filesystem paths of the Leaving Soon virtual libraries to scan.</param>
@@ -254,11 +249,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             }
                         }
 
-                        if (isFavorite && result.Add(actualItemId))
+                        if (isFavorite)
                         {
-                            // Fallback sync: write IsFavorite to the actual item in case Flush() did not
-                            // complete this sync. This is a no-op when Flush() already succeeded.
-                            SyncVirtualFavoriteToActualItem(users, virtualItem, virtualSeriesItem, actualItemId);
+                            result.Add(actualItemId);
                         }
                     }
                     catch (Exception ex)
@@ -269,73 +262,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
 
             return result.Select(id => (id, true)).ToList();
-        }
-
-        /// <summary>
-        /// Writes IsFavorite = true to the actual item for every user who has the virtual item (episode or series)
-        /// favorited. No-op if the actual item is already favorited (primary sync via Flush() already ran).
-        /// </summary>
-        private void SyncVirtualFavoriteToActualItem(
-            IReadOnlyList<Jellyfin.Database.Implementations.Entities.User> users,
-            BaseItem virtualEpisodeItem,
-            BaseItem? virtualSeriesItem,
-            Guid actualItemId)
-        {
-            try
-            {
-                var actualItem = _libraryManager.GetItemById(actualItemId);
-                if (actualItem == null)
-                {
-                    return;
-                }
-
-                foreach (var user in users)
-                {
-                    bool userFavorited = false;
-                    var epData = _userDataManager.GetUserData(user, virtualEpisodeItem);
-                    if (epData?.IsFavorite == true)
-                    {
-                        userFavorited = true;
-                    }
-
-                    if (!userFavorited && virtualSeriesItem != null)
-                    {
-                        var seriesData = _userDataManager.GetUserData(user, virtualSeriesItem);
-                        if (seriesData?.IsFavorite == true)
-                        {
-                            userFavorited = true;
-                        }
-                    }
-
-                    if (!userFavorited)
-                    {
-                        continue;
-                    }
-
-                    var actualData = _userDataManager.GetUserData(user, actualItem);
-                    if (actualData == null || actualData.IsFavorite)
-                    {
-                        continue;
-                    }
-
-                    actualData.IsFavorite = true;
-                    _userDataManager.SaveUserData(
-                        user,
-                        actualItem,
-                        actualData,
-                        MediaBrowser.Model.Entities.UserDataSaveReason.UpdateUserRating,
-                        CancellationToken.None);
-
-                    _logger.LogInformation(
-                        "Synced IsFavorite from virtual Leaving Soon to actual item '{Name}' for user {UserId} (fallback path)",
-                        actualItem.Name,
-                        user.Id);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sync IsFavorite to actual item {ItemId}", actualItemId);
-            }
         }
 
         /// <summary>

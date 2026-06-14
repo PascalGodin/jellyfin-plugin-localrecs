@@ -25,7 +25,6 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         private readonly VirtualLibraryManager _virtualLibraryManager;
         private readonly DiagnosticLogService _diagnosticLogService;
         private readonly ITaskManager _taskManager;
-        private readonly PlayStatusSyncService _playStatusSyncService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecommendationRefreshTask"/> class.
@@ -36,15 +35,13 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
         /// <param name="virtualLibraryManager">Virtual library manager.</param>
         /// <param name="diagnosticLogService">Diagnostic log service for appending post-sync results.</param>
         /// <param name="taskManager">Task manager for triggering library scans.</param>
-        /// <param name="playStatusSyncService">Play status sync service for flushing pending syncs before scoring.</param>
         public RecommendationRefreshTask(
             ILogger<RecommendationRefreshTask> logger,
             IUserManager userManager,
             RecommendationRefreshService refreshService,
             VirtualLibraryManager virtualLibraryManager,
             DiagnosticLogService diagnosticLogService,
-            ITaskManager taskManager,
-            PlayStatusSyncService playStatusSyncService)
+            ITaskManager taskManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -52,7 +49,6 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
             _virtualLibraryManager = virtualLibraryManager ?? throw new ArgumentNullException(nameof(virtualLibraryManager));
             _diagnosticLogService = diagnosticLogService ?? throw new ArgumentNullException(nameof(diagnosticLogService));
             _taskManager = taskManager ?? throw new ArgumentNullException(nameof(taskManager));
-            _playStatusSyncService = playStatusSyncService ?? throw new ArgumentNullException(nameof(playStatusSyncService));
         }
 
         /// <inheritdoc />
@@ -90,11 +86,6 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                     progress?.Report(100);
                     return;
                 }
-
-                // Step 2: Flush any pending virtual-to-source syncs (IsFavorite, play state) before scoring.
-                // All virtual library folders still exist at this point (rebuild hasn't run yet), so
-                // TrySyncSeriesFavoriteToSource can enumerate episode symlinks for series in any library type.
-                _playStatusSyncService.Flush();
 
                 var userIds = users.Select(u => u.Id).ToList();
                 var (userRecommendations, leavingSoonState, allItems) = await _refreshService.GenerateRecommendationsForMultipleUsersAsync(

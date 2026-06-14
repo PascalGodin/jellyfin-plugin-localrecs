@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.16",
+        "changelog": "Revert v0.6.1.15: remove Flush() from task and fallback sync from UserProfileService\n- PlayStatusSyncService already auto-syncs virtual favorites to the actual library via its debounce timer (5s after the user changes favorite status); no task involvement is needed for that flow\n- Removed the public Flush() method added to PlayStatusSyncService in v0.6.1.15\n- Removed PlayStatusSyncService injection and Flush() call from RecommendationRefreshTask\n- Removed SyncVirtualFavoriteToActualItem fallback from GetVirtualLeavingSoonProtectedStatuses in UserProfileService\n- The core fix (v0.6.1.13 TrySyncSeriesFavoriteToSource via episode symlinks) is retained; favoriting a virtual series now reliably propagates to the actual series within 5 seconds via the normal debounce path",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.16/jellyfin-plugin-localrecs-v0.6.1.16.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-13T00:00:00Z"
+      },
+      {
         "version": "0.6.1.15",
         "changelog": "Leaving Soon: unify favorite sync with a single Flush() call at task start\n- All virtual-to-actual sync operations (IsFavorite, play state) are now committed at the very beginning of the recommendation task, before any scoring or virtual library rebuild occurs; all virtual library folders still exist at that point so TrySyncSeriesFavoriteToSource can always enumerate episode symlinks\n- This replaces the synchronous write added to GetVirtualLeavingSoonProtectedStatuses in v0.6.1.14 (now kept only as a silent fallback for edge cases where Flush() could not complete the sync internally)\n- Covers all virtual library types uniformly: Leaving Soon libraries and per-user recommendation libraries, series and movies\n- PlayStatusSyncService gains a public Flush() method; RecommendationRefreshTask injects PlayStatusSyncService and calls Flush() before GenerateRecommendationsForMultipleUsersAsync",
         "targetAbi": "10.11.9.0",
