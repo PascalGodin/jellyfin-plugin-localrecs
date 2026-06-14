@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.LocalRecs.Configuration;
 using Jellyfin.Plugin.LocalRecs.Models;
@@ -163,14 +164,17 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>
         /// Checks virtual Leaving Soon library items for protection flags and maps them back to actual item IDs.
-        /// Handles the case where a user favorites a series in the virtual Leaving Soon library but the flag was
-        /// not synced to the source item. Series items are folders (not symlinks), so PlayStatusSyncService
-        /// cannot resolve them and the sync is silently skipped.
+        /// When a virtual series is favorited, also syncs IsFavorite to the actual series immediately so the
+        /// protection survives the virtual library rebuild that follows (which deletes the virtual series folder,
+        /// preventing the debounce-based PlayStatusSyncService path from running).
         /// </summary>
         /// <param name="userIds">User IDs to check.</param>
         /// <param name="leavingSoonPaths">Filesystem paths of the Leaving Soon virtual libraries to scan.</param>
-        /// <returns>Actual item IDs where any user has the virtual item favorited, OR-aggregated across all users.</returns>
-        public IReadOnlyList<(Guid ActualItemId, bool IsFavorite)> GetVirtualLeavingSoonProtectedStatuses(
+        /// <returns>
+        /// Actual item IDs where any user has the virtual item favorited (OR-aggregated), and a list of
+        /// series names that were synced to the actual library during this call (for diagnostic logging).
+        /// </returns>
+        public (IReadOnlyList<(Guid ActualItemId, bool IsFavorite)> Protected, IReadOnlyList<string> SyncedSeriesNames) GetVirtualLeavingSoonProtectedStatuses(
             IReadOnlyList<Guid> userIds,
             IEnumerable<string> leavingSoonPaths)
         {
@@ -182,10 +186,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (users.Count == 0)
             {
-                return Array.Empty<(Guid, bool)>();
+                return (Array.Empty<(Guid, bool)>(), Array.Empty<string>());
             }
 
             var result = new HashSet<Guid>();
+            var syncedNames = new List<string>();
 
             foreach (var libraryPath in leavingSoonPaths)
             {
@@ -252,9 +257,16 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                             }
                         }
 
-                        if (isFavorite)
+                        if (isFavorite && result.Add(actualItemId))
                         {
-                            result.Add(actualItemId);
+                            // First encounter for this series: sync IsFavorite to the actual item now,
+                            // before the virtual library rebuild deletes the folder and makes the
+                            // PlayStatusSyncService debounce path unable to enumerate episode symlinks.
+                            var synced = SyncVirtualFavoriteToActualItem(users, virtualItem, virtualSeriesItem, actualItemId);
+                            if (synced != null)
+                            {
+                                syncedNames.Add(synced);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -264,7 +276,81 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            return result.Select(id => (id, true)).ToList();
+            return (result.Select(id => (id, true)).ToList(), syncedNames);
+        }
+
+        /// <summary>
+        /// Writes IsFavorite = true to the actual item for every user who has the virtual item (episode or series)
+        /// favorited. Returns the actual item's name if any write was performed, null otherwise.
+        /// </summary>
+        private string? SyncVirtualFavoriteToActualItem(
+            IReadOnlyList<Jellyfin.Database.Implementations.Entities.User> users,
+            BaseItem virtualEpisodeItem,
+            BaseItem? virtualSeriesItem,
+            Guid actualItemId)
+        {
+            try
+            {
+                var actualItem = _libraryManager.GetItemById(actualItemId);
+                if (actualItem == null)
+                {
+                    return null;
+                }
+
+                var didSync = false;
+
+                foreach (var user in users)
+                {
+                    bool userFavorited = false;
+                    var epData = _userDataManager.GetUserData(user, virtualEpisodeItem);
+                    if (epData?.IsFavorite == true)
+                    {
+                        userFavorited = true;
+                    }
+
+                    if (!userFavorited && virtualSeriesItem != null)
+                    {
+                        var seriesData = _userDataManager.GetUserData(user, virtualSeriesItem);
+                        if (seriesData?.IsFavorite == true)
+                        {
+                            userFavorited = true;
+                        }
+                    }
+
+                    if (!userFavorited)
+                    {
+                        continue;
+                    }
+
+                    var actualData = _userDataManager.GetUserData(user, actualItem);
+                    if (actualData == null || actualData.IsFavorite)
+                    {
+                        continue;
+                    }
+
+                    actualData.IsFavorite = true;
+                    _userDataManager.SaveUserData(
+                        user,
+                        actualItem,
+                        actualData,
+                        MediaBrowser.Model.Entities.UserDataSaveReason.UpdateUserRating,
+                        CancellationToken.None);
+
+                    _logger.LogInformation(
+                        "Synced IsFavorite from virtual Leaving Soon to actual item '{Name}' for user {UserId}",
+                        actualItem.Name,
+                        user.Id);
+
+                    didSync = true;
+                }
+
+                return didSync ? actualItem.Name : null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sync IsFavorite to actual item {ItemId}", actualItemId);
+                return null;
+            }
         }
 
         /// <summary>
