@@ -245,10 +245,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             // libraries. Series items are folders (not symlinks), so PlayStatusSyncService cannot resolve them
             // and the sync to the source item is silently skipped. Scan the virtual libraries here to catch
             // any favorite flags that were not synced before the Leaving Soon gate runs.
-            IReadOnlyList<string> virtualFavoriteSyncedNames = Array.Empty<string>();
             if (config.LeavingSoonEnabled)
             {
-                var (virtualProtected, syncedNames) = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
+                var virtualProtected = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
                     userIds,
                     new[]
                     {
@@ -257,7 +256,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         _virtualLibraryManager.RemovalCandidatesMoviesPath,
                         _virtualLibraryManager.RemovalCandidatesTvPath,
                     });
-                virtualFavoriteSyncedNames = syncedNames;
                 foreach (var (actualItemId, isFavorite) in virtualProtected)
                 {
                     if (watchStatus.TryGetValue(actualItemId, out var ws))
@@ -295,7 +293,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (config.EnableDiagnosticLog)
             {
-                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, virtualFavoriteSyncedNames, config, libraryScan, vocabularyBuild, embeddingCompute);
+                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, config, libraryScan, vocabularyBuild, embeddingCompute);
             }
 
             return Task.FromResult((results, leavingSoonState, allItems));
@@ -517,7 +515,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 TimeSpan UserDuration)> userEntries,
             LeavingSoonState? leavingSoonState,
             LeavingSoonDiagnostics? leavingSoonDiagnostics,
-            IReadOnlyList<string> virtualFavoriteSyncedNames,
             PluginConfiguration config,
             TimeSpan libraryScan,
             TimeSpan vocabularyBuild,
@@ -709,17 +706,6 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 sb.AppendLine(dash);
                 sb.AppendLine("LEAVING SOON");
                 sb.AppendLine();
-
-                if (virtualFavoriteSyncedNames.Count > 0)
-                {
-                    sb.AppendLine($"  Virtual favorites synced to actual library ({virtualFavoriteSyncedNames.Count}):");
-                    foreach (var name in virtualFavoriteSyncedNames)
-                    {
-                        sb.AppendLine($"    - {name}");
-                    }
-
-                    sb.AppendLine();
-                }
 
                 if (leavingSoonDiagnostics != null)
                 {

@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.15",
+        "changelog": "Leaving Soon: unify favorite sync with a single Flush() call at task start\n- All virtual-to-actual sync operations (IsFavorite, play state) are now committed at the very beginning of the recommendation task, before any scoring or virtual library rebuild occurs; all virtual library folders still exist at that point so TrySyncSeriesFavoriteToSource can always enumerate episode symlinks\n- This replaces the synchronous write added to GetVirtualLeavingSoonProtectedStatuses in v0.6.1.14 (now kept only as a silent fallback for edge cases where Flush() could not complete the sync internally)\n- Covers all virtual library types uniformly: Leaving Soon libraries and per-user recommendation libraries, series and movies\n- PlayStatusSyncService gains a public Flush() method; RecommendationRefreshTask injects PlayStatusSyncService and calls Flush() before GenerateRecommendationsForMultipleUsersAsync",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.15/jellyfin-plugin-localrecs-v0.6.1.15.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-06-13T00:00:00Z"
+      },
+      {
         "version": "0.6.1.14",
         "changelog": "Leaving Soon: fix series favorite protection not persisting across task runs\n- Root cause: when a user favorites a series in the Leaving Soon virtual library and the task runs, GetVirtualLeavingSoonProtectedStatuses correctly detected the favorite and protected the series; but then the virtual library rebuild deleted the series folder; when the PlayStatusSyncService debounce fired 5 seconds later, Directory.Exists returned false and the sync to the actual series was skipped; on the next task run the virtual series was gone and the actual series was not favorited, so the show was re-flagged\n- Fix: GetVirtualLeavingSoonProtectedStatuses now syncs IsFavorite = true to the actual series immediately (synchronously, before the rebuild) the first time it detects a virtual series as favorited; this ensures the protection is permanent regardless of debounce timing\n- Diagnostic log: LEAVING SOON section now shows a 'Virtual favorites synced to actual library' list when any syncs occurred, making it easy to confirm the fix is working",
         "targetAbi": "10.11.9.0",

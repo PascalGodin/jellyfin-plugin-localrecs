@@ -164,17 +164,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>
         /// Checks virtual Leaving Soon library items for protection flags and maps them back to actual item IDs.
-        /// When a virtual series is favorited, also syncs IsFavorite to the actual series immediately so the
-        /// protection survives the virtual library rebuild that follows (which deletes the virtual series folder,
-        /// preventing the debounce-based PlayStatusSyncService path from running).
+        /// When a virtual series is favorited, also syncs IsFavorite to the actual series as a fallback for the
+        /// case where PlayStatusSyncService.Flush() could not complete the sync (e.g. an internal failure during
+        /// the flush that left the actual item unfavorited). The primary sync path is the explicit Flush() call
+        /// at the start of the recommendation task; this write is a no-op when Flush() already succeeded.
         /// </summary>
         /// <param name="userIds">User IDs to check.</param>
         /// <param name="leavingSoonPaths">Filesystem paths of the Leaving Soon virtual libraries to scan.</param>
-        /// <returns>
-        /// Actual item IDs where any user has the virtual item favorited (OR-aggregated), and a list of
-        /// series names that were synced to the actual library during this call (for diagnostic logging).
-        /// </returns>
-        public (IReadOnlyList<(Guid ActualItemId, bool IsFavorite)> Protected, IReadOnlyList<string> SyncedSeriesNames) GetVirtualLeavingSoonProtectedStatuses(
+        /// <returns>Actual item IDs where any user has the virtual item favorited, OR-aggregated across all users.</returns>
+        public IReadOnlyList<(Guid ActualItemId, bool IsFavorite)> GetVirtualLeavingSoonProtectedStatuses(
             IReadOnlyList<Guid> userIds,
             IEnumerable<string> leavingSoonPaths)
         {
@@ -186,11 +184,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (users.Count == 0)
             {
-                return (Array.Empty<(Guid, bool)>(), Array.Empty<string>());
+                return Array.Empty<(Guid, bool)>();
             }
 
             var result = new HashSet<Guid>();
-            var syncedNames = new List<string>();
 
             foreach (var libraryPath in leavingSoonPaths)
             {
@@ -259,14 +256,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                         if (isFavorite && result.Add(actualItemId))
                         {
-                            // First encounter for this series: sync IsFavorite to the actual item now,
-                            // before the virtual library rebuild deletes the folder and makes the
-                            // PlayStatusSyncService debounce path unable to enumerate episode symlinks.
-                            var synced = SyncVirtualFavoriteToActualItem(users, virtualItem, virtualSeriesItem, actualItemId);
-                            if (synced != null)
-                            {
-                                syncedNames.Add(synced);
-                            }
+                            // Fallback sync: write IsFavorite to the actual item in case Flush() did not
+                            // complete this sync. This is a no-op when Flush() already succeeded.
+                            SyncVirtualFavoriteToActualItem(users, virtualItem, virtualSeriesItem, actualItemId);
                         }
                     }
                     catch (Exception ex)
@@ -276,14 +268,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 }
             }
 
-            return (result.Select(id => (id, true)).ToList(), syncedNames);
+            return result.Select(id => (id, true)).ToList();
         }
 
         /// <summary>
         /// Writes IsFavorite = true to the actual item for every user who has the virtual item (episode or series)
-        /// favorited. Returns the actual item's name if any write was performed, null otherwise.
+        /// favorited. No-op if the actual item is already favorited (primary sync via Flush() already ran).
         /// </summary>
-        private string? SyncVirtualFavoriteToActualItem(
+        private void SyncVirtualFavoriteToActualItem(
             IReadOnlyList<Jellyfin.Database.Implementations.Entities.User> users,
             BaseItem virtualEpisodeItem,
             BaseItem? virtualSeriesItem,
@@ -294,10 +286,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 var actualItem = _libraryManager.GetItemById(actualItemId);
                 if (actualItem == null)
                 {
-                    return null;
+                    return;
                 }
-
-                var didSync = false;
 
                 foreach (var user in users)
                 {
@@ -337,19 +327,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                         CancellationToken.None);
 
                     _logger.LogInformation(
-                        "Synced IsFavorite from virtual Leaving Soon to actual item '{Name}' for user {UserId}",
+                        "Synced IsFavorite from virtual Leaving Soon to actual item '{Name}' for user {UserId} (fallback path)",
                         actualItem.Name,
                         user.Id);
-
-                    didSync = true;
                 }
-
-                return didSync ? actualItem.Name : null;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to sync IsFavorite to actual item {ItemId}", actualItemId);
-                return null;
             }
         }
 
