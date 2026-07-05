@@ -97,6 +97,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             Promote(state, config);
             cancellationToken.ThrowIfCancellationRequested();
 
+            var knownItemIds = new HashSet<string>(allItems.Select(a => a.Id.ToString()), StringComparer.OrdinalIgnoreCase);
+
             // Pass 2: Discover new candidates and reconcile FlaggedItems
             LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
@@ -110,6 +112,23 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Pass 3: Remove removal candidate entries for items that no longer exist in the library.
+            // FlaggedItems are already cleaned up by discovery eviction (Pass 2) — deleted items aren't
+            // scored and fall out of the target set, so they get evicted automatically. RemovalCandidates
+            // have no such mechanism: once promoted, entries accumulate indefinitely unless explicitly pruned.
+            var removedRemoval = state.RemovalCandidates.Keys.Where(id => !knownItemIds.Contains(id)).ToList();
+            foreach (var id in removedRemoval)
+            {
+                state.RemovalCandidates.Remove(id);
+            }
+
+            if (removedRemoval.Count > 0)
+            {
+                _logger.LogInformation(
+                    "Leaving Soon cleanup: removed {RemovedRemoval} removal candidates for items no longer in the library",
+                    removedRemoval.Count);
+            }
 
             SaveState(state);
 
