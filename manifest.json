@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.6.1.16",
-        "changelog": "Revert v0.6.1.15: remove Flush() from task and fallback sync from UserProfileService\n- PlayStatusSyncService already auto-syncs virtual favorites to the actual library via its debounce timer (5s after the user changes favorite status); no task involvement is needed for that flow\n- Removed the public Flush() method added to PlayStatusSyncService in v0.6.1.15\n- Removed PlayStatusSyncService injection and Flush() call from RecommendationRefreshTask\n- Removed SyncVirtualFavoriteToActualItem fallback from GetVirtualLeavingSoonProtectedStatuses in UserProfileService\n- The core fix (v0.6.1.13 TrySyncSeriesFavoriteToSource via episode symlinks) is retained; favoriting a virtual series now reliably propagates to the actual series within 5 seconds via the normal debounce path",
+        "version": "0.6.1.17",
+        "changelog": "Fix: prune stale RemovalCandidates when items are deleted from Jellyfin\n- Added Pass 3 cleanup in LeavingSoonService.Refresh that removes removal candidates whose IDs no longer exist in the library\n- Uses HashSet for O(1) lookups instead of O(n) linear scans when checking thousands of candidates against library size\n- Preserves FlaggedItems eviction logic unchanged (discovery handles it naturally)\n- Add 17 unit tests covering null validation, promotion, discovery scoring, removal candidate cleanup, state persistence, and flagged item eviction (>80% domain coverage)",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.16/jellyfin-plugin-localrecs-v0.6.1.16.zip",
-        "checksum": "bbad211314171d35c9102dc75e3d22ab",
-        "timestamp": "2026-06-13T00:00:00Z"
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.17/jellyfin-plugin-localrecs-v0.6.1.17.zip",
+        "checksum": "PLACEHOLDER",
+        "timestamp": "2026-07-05T00:00:00Z"
       },
       {
         "version": "0.6.1.15",
