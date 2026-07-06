@@ -242,3 +242,6 @@ AGENTS.md
 
 # Environment variables (contains credentials)
 .env
+
+# Opencode config (local-only, contains local model paths and API keys)
+opencode.json
