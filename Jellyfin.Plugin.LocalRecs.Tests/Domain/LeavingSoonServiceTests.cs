@@ -118,7 +118,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var service = CreateService();
             Action act = () => service.Refresh(
                 null!, Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
-                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig());
+                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("allItems");
         }
@@ -129,7 +129,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var service = CreateService();
             Action act = () => service.Refresh(
                 Array.Empty<MediaItemMetadata>(), null!, Array.Empty<UserProfile>(),
-                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig());
+                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("embeddings");
         }
@@ -363,8 +363,8 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
 
             // Assert: re-read state from disk to verify persistence
             var persisted = System.Text.Json.JsonSerializer.Deserialize<LeavingSoonState>(File.ReadAllText(jsonPath));
-            persisted.Should().NotContainKey(deletedId.ToString());
-            persisted.Should().ContainKey(existingId.ToString());
+            persisted.RemovalCandidates.Should().NotContainKey(deletedId.ToString());
+            persisted.RemovalCandidates.Should().ContainKey(existingId.ToString());
         }
 
         #endregion
@@ -439,7 +439,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                 watchStatus[id] = (DateTime.UtcNow.AddDays(-60), false);
 
             // Act
-            var (state, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config);
+            var (state, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
 
             // Assert: exactly 3 movies should be flagged (the worst-similarity ones)
             state.FlaggedItems.Should().HaveCount(3);
@@ -630,13 +630,13 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = movieIds.ToDictionary(x => x.Item2, x => (DateTime.UtcNow.AddDays(-60), false));
 
             // Act Run 1
-            var (state1, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config);
+            var (state1, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
 
             // Assert: flagged items should be present after first run
             state1.FlaggedItems.Should().HaveCount(1);
 
             // Act Run 2 with same inputs — state should persist from disk
-            var (state2, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config);
+            var (state2, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
 
             // Assert: FlaggedItems persisted across runs
             state2.FlaggedItems.Should().HaveCount(1);
