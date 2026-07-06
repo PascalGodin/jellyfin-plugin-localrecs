@@ -97,6 +97,14 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             return new UserProfile(Guid.NewGuid(), tasteVector) { WatchedItemCount = ids.Count };
         }
 
+        /// <summary>
+        /// A single throwaway profile just to make eligibleProfiles.Count > 0 so Discover() runs.
+        /// Its vector is never compared against an embedding in the tests that use it, since
+        /// those items are skipped before reaching the similarity scoring step.
+        /// </summary>
+        private static List<UserProfile> DummyProfiles() =>
+            new() { new UserProfile(Guid.NewGuid(), new float[] { 1f }) };
+
         private void MockLibraryItem(MediaItemMetadata meta, DateTime? dateCreated = null)
         {
             var mock = new Mock<BaseItem>();
@@ -410,6 +418,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                 {
                     ReleaseYear = 2020, CommunityRating = 8.0f
                 });
+                library.Last().AddGenre("Action");
                 MockLibraryItem(library.Last());
             }
 
@@ -471,7 +480,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
+            var (_, diagnostics) = service.Refresh(library, embeddings, DummyProfiles(), watchStatus, config, default);
 
             // Assert: the item should be counted as SkippedAlreadyRemoval
             diagnostics.SkippedAlreadyRemoval.Should().Be(1);
@@ -498,7 +507,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
+            var (_, diagnostics) = service.Refresh(library, embeddings, DummyProfiles(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNoMetadata.Should().Be(1);
@@ -517,6 +526,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                     ReleaseYear = 2020, CommunityRating = 8.0f
                 }
             };
+            library[0].AddGenre("Action");
             MockLibraryItem(library[0]);
 
             var embeddings = CreateEmbeddings(library);
@@ -525,7 +535,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)> { { movieId, (null, true) } };
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
+            var (_, diagnostics) = service.Refresh(library, embeddings, DummyProfiles(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedAlwaysSafe.Should().Be(1);
@@ -544,6 +554,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                     ReleaseYear = 2020, CommunityRating = 8.0f
                 }
             };
+            library[0].AddGenre("Action");
             MockLibraryItem(library[0]);
 
             // Empty embeddings — item has no embedding
@@ -551,7 +562,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, new Dictionary<Guid, ItemEmbedding>(), Array.Empty<UserProfile>(), watchStatus, config, default);
+            var (_, diagnostics) = service.Refresh(library, new Dictionary<Guid, ItemEmbedding>(), DummyProfiles(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNoEmbedding.Should().Be(1);
@@ -570,6 +581,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                     ReleaseYear = 2020, CommunityRating = 8.0f
                 }
             };
+            library[0].AddGenre("Action");
             // Mock GetItemById to return null for this item
             _mockLibraryManager.Setup(m => m.GetItemById(movieId)).Returns((BaseItem)null!);
 
@@ -578,7 +590,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
+            var (_, diagnostics) = service.Refresh(library, embeddings, DummyProfiles(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNotFound.Should().Be(1);
@@ -607,6 +619,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                 {
                     ReleaseYear = 2020, CommunityRating = 8.0f
                 });
+                library.Last().AddGenre("Action");
                 MockLibraryItem(library.Last());
             }
 
