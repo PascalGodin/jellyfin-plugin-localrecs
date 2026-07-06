@@ -12,7 +12,7 @@
         "changelog": "Fix: prune stale RemovalCandidates when items are deleted from Jellyfin\n- Added Pass 3 cleanup in LeavingSoonService.Refresh that removes removal candidates whose IDs no longer exist in the library\n- Uses HashSet for O(1) lookups instead of O(n) linear scans when checking thousands of candidates against library size\n- Preserves FlaggedItems eviction logic unchanged (discovery handles it naturally)\n- Add 17 unit tests covering null validation, promotion, discovery scoring, removal candidate cleanup, state persistence, and flagged item eviction (>80% domain coverage)",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.17/jellyfin-plugin-localrecs-v0.6.1.17.zip",
-        "checksum": "34b9834deb60700a424a8ccb2a39d25a",
+        "checksum": "f86dbe8ded1de25014ebb20152abf688",
         "timestamp": "2026-07-05T00:00:00Z"
       },
       {
