@@ -12,7 +12,7 @@
         "changelog": "Fix: assembly version was not bumped alongside the v0.6.1.17 manifest entry, causing Jellyfin to report the plugin as still on 0.6.1.16 after install\n- Bump csproj Version/AssemblyVersion/FileVersion to match the release tag\n- No functional changes beyond v0.6.1.17 (Pass 3 RemovalCandidates cleanup, test suite fixes)",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.18/jellyfin-plugin-localrecs-v0.6.1.18.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "c5e39f82a0a9501b7502817e8ce7d038",
         "timestamp": "2026-07-06T00:00:00Z"
       },
       {
