@@ -117,7 +117,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         {
             var service = CreateService();
             Action act = () => service.Refresh(
-                null!, Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
+                null!, new Dictionary<Guid, ItemEmbedding>(), Array.Empty<UserProfile>(),
                 new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("allItems");
@@ -140,7 +140,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var service = CreateService();
             Action act = () => service.Refresh(
                 Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), null!,
-                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig());
+                new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("eligibleProfiles");
         }
@@ -151,7 +151,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var service = CreateService();
             Action act = () => service.Refresh(
                 Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
-                null!, DefaultConfig());
+                null!, DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("watchStatus");
         }
@@ -162,7 +162,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var service = CreateService();
             Action act = () => service.Refresh(
                 Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
-                new Dictionary<Guid, (DateTime?, bool)>(), null!);
+                new Dictionary<Guid, (DateTime?, bool)>(), null!, default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("config");
         }
@@ -189,7 +189,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: run with no eligible profiles so discovery is skipped but state still persists
-            service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: promotion happened even without discovery running — but Refresh was called
             // with empty profiles, so Discover returns early. The old state file was loaded and saved back.
