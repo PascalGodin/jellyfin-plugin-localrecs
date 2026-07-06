@@ -139,7 +139,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         {
             var service = CreateService();
             Action act = () => service.Refresh(
-                Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), null!,
+                Array.Empty<MediaItemMetadata>(), new Dictionary<Guid, ItemEmbedding>(), null!,
                 new Dictionary<Guid, (DateTime?, bool)>(), DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("eligibleProfiles");
@@ -150,7 +150,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         {
             var service = CreateService();
             Action act = () => service.Refresh(
-                Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
+                Array.Empty<MediaItemMetadata>(), new Dictionary<Guid, ItemEmbedding>(), Array.Empty<UserProfile>(),
                 null!, DefaultConfig(), default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("watchStatus");
@@ -161,7 +161,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         {
             var service = CreateService();
             Action act = () => service.Refresh(
-                Array.Empty<MediaItemMetadata>(), Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(),
+                Array.Empty<MediaItemMetadata>(), new Dictionary<Guid, ItemEmbedding>(), Array.Empty<UserProfile>(),
                 new Dictionary<Guid, (DateTime?, bool)>(), null!, default);
 
             act.Should().Throw<ArgumentNullException>().WithParameterName("config");
@@ -230,7 +230,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: Refresh with only the surviving item in the library
-            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: the deleted item should be pruned from RemovalCandidates
             state.RemovalCandidates.Should().NotContainKey(deletedMovieId.ToString());
@@ -263,7 +263,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: Refresh with the item still in the library
-            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: existing items should be kept
             state.RemovalCandidates.Should().ContainKey(existingMovieId.ToString());
@@ -298,7 +298,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: Refresh with only existing items in the library
-            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: all deleted candidates should be pruned, existing ones kept
             foreach (var id in deletedIds)
@@ -326,7 +326,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var config = DefaultConfig(dwellDays: 1, minAgeDays: 0);
 
             // Act: Refresh with empty state and no profiles (discovery skipped)
-            var (_, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (_, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: should not throw; state remains clean
         }
@@ -359,11 +359,11 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: Refresh with only the surviving item in the library
-            service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: re-read state from disk to verify persistence
             var persisted = System.Text.Json.JsonSerializer.Deserialize<LeavingSoonState>(File.ReadAllText(jsonPath));
-            persisted.RemovalCandidates.Should().NotContainKey(deletedId.ToString());
+            persisted!.RemovalCandidates.Should().NotContainKey(deletedId.ToString());
             persisted.RemovalCandidates.Should().ContainKey(existingId.ToString());
         }
 
@@ -383,7 +383,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var config = DefaultConfig(dwellDays: 1, minAgeDays: 0);
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert
             diagnostics.EligibleProfileCount.Should().Be(0);
@@ -439,7 +439,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                 watchStatus[id] = (DateTime.UtcNow.AddDays(-60), false);
 
             // Act
-            var (state, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
+            var (state, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default);
 
             // Assert: exactly 3 movies should be flagged (the worst-similarity ones)
             state.FlaggedItems.Should().HaveCount(3);
@@ -471,7 +471,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert: the item should be counted as SkippedAlreadyRemoval
             diagnostics.SkippedAlreadyRemoval.Should().Be(1);
@@ -498,7 +498,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNoMetadata.Should().Be(1);
@@ -525,7 +525,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)> { { movieId, (null, true) } };
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedAlwaysSafe.Should().Be(1);
@@ -551,7 +551,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, Array.Empty<ItemEmbedding>(), Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, diagnostics) = service.Refresh(library, new Dictionary<Guid, ItemEmbedding>(), Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNoEmbedding.Should().Be(1);
@@ -578,7 +578,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act
-            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, diagnostics) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert
             diagnostics.SkippedNotFound.Should().Be(1);
@@ -630,13 +630,13 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = movieIds.ToDictionary(x => x.Item2, x => (DateTime.UtcNow.AddDays(-60), false));
 
             // Act Run 1
-            var (state1, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
+            var (state1, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default);
 
             // Assert: flagged items should be present after first run
             state1.FlaggedItems.Should().HaveCount(1);
 
             // Act Run 2 with same inputs — state should persist from disk
-            var (state2, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default, default);
+            var (state2, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default);
 
             // Assert: FlaggedItems persisted across runs
             state2.FlaggedItems.Should().HaveCount(1);
@@ -662,7 +662,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var watchStatus = new Dictionary<Guid, (DateTime?, bool)>();
 
             // Act: state file doesn't exist yet
-            var (_, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config);
+            var (_, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, config, default);
 
             // Assert: should not throw and should return fresh state
         }
@@ -700,7 +700,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
 
             // Act: Refresh with only the surviving item in the library
-            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config);
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), new Dictionary<Guid, (DateTime?, bool)>(), config, default);
 
             // Assert: deleted flagged items should be evicted by discovery (not scored → not in target set)
             state.FlaggedItems.Should().NotContainKey(deletedId.ToString());
