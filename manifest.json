@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.18",
+        "changelog": "Fix: assembly version was not bumped alongside the v0.6.1.17 manifest entry, causing Jellyfin to report the plugin as still on 0.6.1.16 after install\n- Bump csproj Version/AssemblyVersion/FileVersion to match the release tag\n- No functional changes beyond v0.6.1.17 (Pass 3 RemovalCandidates cleanup, test suite fixes)",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.18/jellyfin-plugin-localrecs-v0.6.1.18.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-07-06T00:00:00Z"
+      },
+      {
         "version": "0.6.1.17",
         "changelog": "Fix: prune stale RemovalCandidates when items are deleted from Jellyfin\n- Added Pass 3 cleanup in LeavingSoonService.Refresh that removes removal candidates whose IDs no longer exist in the library\n- Uses HashSet for O(1) lookups instead of O(n) linear scans when checking thousands of candidates against library size\n- Preserves FlaggedItems eviction logic unchanged (discovery handles it naturally)\n- Add 17 unit tests covering null validation, promotion, discovery scoring, removal candidate cleanup, state persistence, and flagged item eviction (>80% domain coverage)",
         "targetAbi": "10.11.9.0",
