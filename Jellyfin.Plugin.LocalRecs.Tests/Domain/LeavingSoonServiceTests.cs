@@ -105,7 +105,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             _mockLibraryManager.Setup(m => m.GetItemById(meta.Id)).Returns(mock.Object);
         }
 
-        private void Dispose()
+        public void Dispose()
         {
             try { Directory.Delete(_tempDir, true); } catch { /* ignore */ }
         }
