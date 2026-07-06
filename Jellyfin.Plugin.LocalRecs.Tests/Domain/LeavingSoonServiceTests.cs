@@ -627,7 +627,7 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             var profile = new UserProfile(Guid.NewGuid(), tasteVector) { WatchedItemCount = 5 };
 
             var config = DefaultConfig(movieCount: 1, dwellDays: 1, minAgeDays: 0);
-            var watchStatus = movieIds.ToDictionary(x => x.Item2, x => (DateTime.UtcNow.AddDays(-60), false));
+            var watchStatus = movieIds.ToDictionary(x => x.Item2, x => ((DateTime?)DateTime.UtcNow.AddDays(-60), false));
 
             // Act Run 1
             var (state1, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default);
