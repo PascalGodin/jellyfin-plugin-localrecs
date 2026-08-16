@@ -469,6 +469,222 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
                 "should complete in reasonable time (test includes mocking overhead, production target is <500ms)");
         }
 
+        #region Diversity Reranking Tests
+
+        [Fact]
+        public void GenerateRecommendations_DiversityOn_LimitsFranchiseClusterRepresentation()
+        {
+            // Arrange
+            var (library, franchiseIds, diverseIds, watchedIds) = CreateFranchiseClusterLibrary();
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 0.7;
+
+            // Act
+            var recommendations = _engine.GenerateRecommendations(
+                _testUserId,
+                userProfile,
+                embeddings,
+                metadata,
+                _config,
+                maxResults: 5);
+
+            // Assert: the 5-item franchise cluster shouldn't fully dominate a 5-slot list
+            var franchisePicked = recommendations.Count(r => franchiseIds.Contains(r.ItemId));
+            var diversePicked = recommendations.Count(r => diverseIds.Contains(r.ItemId));
+
+            franchisePicked.Should().BeLessThan(5, "diversity re-ranking should leave room for non-franchise picks");
+            diversePicked.Should().BeGreaterThanOrEqualTo(2, "at least some diverse genres should make it in");
+        }
+
+        [Fact]
+        public void GenerateRecommendations_DiversityOff_StillStrictlyDescendingByScore()
+        {
+            // Arrange
+            var (library, _, _, watchedIds) = CreateFranchiseClusterLibrary();
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = false;
+
+            // Act
+            var recommendations = _engine.GenerateRecommendations(
+                _testUserId,
+                userProfile,
+                embeddings,
+                metadata,
+                _config,
+                maxResults: 10);
+
+            // Assert: with the flag off, selection is untouched — still plain score-descending
+            for (int i = 0; i < recommendations.Count - 1; i++)
+            {
+                recommendations[i].Score.Should().BeGreaterThanOrEqualTo(recommendations[i + 1].Score);
+            }
+        }
+
+        [Fact]
+        public void GenerateRecommendations_DiversityWeightZero_MatchesPlainScoreOrdering()
+        {
+            // Arrange
+            var (library, _, _, watchedIds) = CreateFranchiseClusterLibrary();
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            // maxResults is deliberately less than the 10 available candidates so the comparison
+            // actually exercises the per-pick weighted formula, not the short-circuit path that
+            // returns everyone (which also happens to be score-sorted, but wouldn't prove anything
+            // about the weight=0.0 blend itself).
+            _config.EnableDiversityReranking = false;
+            var plainOrder = _engine.GenerateRecommendations(
+                _testUserId, userProfile, embeddings, metadata, _config, maxResults: 7)
+                .Select(r => r.ItemId)
+                .ToList();
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 0.0;
+
+            // Act
+            var diversityOrder = _engine.GenerateRecommendations(
+                _testUserId, userProfile, embeddings, metadata, _config, maxResults: 7)
+                .Select(r => r.ItemId)
+                .ToList();
+
+            // Assert: weight 0.0 must degenerate exactly to plain relevance ordering
+            diversityOrder.Should().Equal(plainOrder);
+        }
+
+        [Fact]
+        public void GenerateRecommendations_DiversityWeightOne_AvoidsSelectingMultipleFromCluster()
+        {
+            // Arrange
+            var (library, franchiseIds, _, watchedIds) = CreateFranchiseClusterLibrary();
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 1.0;
+
+            // Act
+            var recommendations = _engine.GenerateRecommendations(
+                _testUserId,
+                userProfile,
+                embeddings,
+                metadata,
+                _config,
+                maxResults: 5);
+
+            // Assert: at the pure-diversity extreme, only the seed pick may come from the cluster
+            recommendations.Count(r => franchiseIds.Contains(r.ItemId)).Should().BeLessOrEqualTo(1);
+        }
+
+        [Fact]
+        public void GenerateRecommendations_DiversityEnabled_FewerCandidatesThanMaxResults_ReturnsAllUnfiltered()
+        {
+            // Arrange: a tiny library, far fewer unwatched candidates than maxResults
+            var library = new List<MediaItemMetadata>();
+            var watchedIds = new List<Guid>();
+            for (int i = 0; i < 3; i++)
+            {
+                var watched = new MediaItemMetadata(Guid.NewGuid(), $"Watched Seed {i}", MediaType.Movie);
+                watched.AddGenre("Action");
+                library.Add(watched);
+                watchedIds.Add(watched.Id);
+            }
+
+            var candidateIds = new List<Guid>();
+            for (int i = 0; i < 3; i++)
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"Candidate {i}", MediaType.Movie);
+                item.AddGenre("Action");
+                library.Add(item);
+                candidateIds.Add(item.Id);
+            }
+
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var id in candidateIds)
+            {
+                SetupUnwatchedItem(metadata[id]);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 0.5;
+
+            // Act
+            var recommendations = _engine.GenerateRecommendations(
+                _testUserId,
+                userProfile,
+                embeddings,
+                metadata,
+                _config,
+                maxResults: 25);
+
+            // Assert: the short-circuit path shouldn't drop or throw — all 3 candidates come back
+            recommendations.Should().HaveCount(3);
+            recommendations.Select(r => r.ItemId).Should().BeEquivalentTo(candidateIds);
+        }
+
+        #endregion
+
         // Helper Methods
 
         private List<MediaItemMetadata> CreateLargeLibrary(int itemCount)
@@ -556,6 +772,46 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             }
 
             return embeddings;
+        }
+
+        /// <summary>
+        /// Builds a library with a 5-item "franchise" cluster (all tagged the same single genre, so
+        /// <see cref="CreateEmbeddings"/> gives them near-identical vectors), 5 genre-diverse items, and
+        /// 3 watched seed items (also single-genre-matching the cluster) to build a taste profile that
+        /// favors the cluster above the diverse items.
+        /// </summary>
+        private (List<MediaItemMetadata> Library, List<Guid> FranchiseIds, List<Guid> DiverseIds, List<Guid> WatchedIds) CreateFranchiseClusterLibrary()
+        {
+            var library = new List<MediaItemMetadata>();
+            var watchedIds = new List<Guid>();
+
+            for (int i = 0; i < 3; i++)
+            {
+                var watched = new MediaItemMetadata(Guid.NewGuid(), $"Watched Action Seed {i}", MediaType.Movie);
+                watched.AddGenre("Action");
+                library.Add(watched);
+                watchedIds.Add(watched.Id);
+            }
+
+            var franchiseIds = new List<Guid>();
+            for (int i = 0; i < 5; i++)
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"Action Franchise {i}", MediaType.Movie);
+                item.AddGenre("Action");
+                library.Add(item);
+                franchiseIds.Add(item.Id);
+            }
+
+            var diverseIds = new List<Guid>();
+            foreach (var genre in new[] { "Drama", "Comedy", "Horror", "Thriller", "Crime" })
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"{genre} Movie", MediaType.Movie);
+                item.AddGenre(genre);
+                library.Add(item);
+                diverseIds.Add(item.Id);
+            }
+
+            return (library, franchiseIds, diverseIds, watchedIds);
         }
 
         private UserProfile CreateSciFiUserProfile(

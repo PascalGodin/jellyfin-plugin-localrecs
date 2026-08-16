@@ -169,11 +169,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 };
             }
 
-            // Sort by score descending and take top N
-            var recommendations = scoredCandidates
-                .OrderByDescending(r => r.Score)
-                .Take(maxResults)
-                .ToList();
+            // Sort by score descending and take top N, optionally trading some relevance for
+            // variety so franchise/sequel entries don't dominate the list.
+            var recommendations = config.EnableDiversityReranking
+                ? ApplyDiversityReranking(scoredCandidates, embeddings, maxResults, config.DiversityWeight)
+                : scoredCandidates.OrderByDescending(r => r.Score).Take(maxResults).ToList();
 
             _logger.LogDebug(
                 "Generated {RecommendationCount} recommendations for user {UserId}",
@@ -407,6 +407,74 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 ItemCommunityRating = itemMetadata.CommunityRating,
                 ItemCriticRating = itemMetadata.CriticRating
             };
+        }
+
+        /// <summary>
+        /// Selects the top <paramref name="maxResults"/> candidates using greedy Maximal Marginal
+        /// Relevance: each pick after the first trades off raw relevance (<see cref="ScoredRecommendation.Score"/>)
+        /// against similarity to items already selected, so franchise/sequel clusters that share heavy
+        /// actor/genre/tag overlap don't dominate the list the way plain score-descending selection allows.
+        /// Every candidate is guaranteed to have an entry in <paramref name="embeddings"/>, since
+        /// <paramref name="scoredCandidates"/> is only ever built from candidates that already passed an
+        /// embeddings lookup.
+        /// </summary>
+        /// <param name="scoredCandidates">All scored candidates for this request.</param>
+        /// <param name="embeddings">Item embeddings, used to compute similarity between candidates.</param>
+        /// <param name="maxResults">Maximum number of recommendations to return.</param>
+        /// <param name="diversityWeight">0.0 = pure relevance (matches plain score-descending selection), 1.0 = pure diversity.</param>
+        /// <returns>Selected recommendations in pick order.</returns>
+        private List<ScoredRecommendation> ApplyDiversityReranking(
+            List<ScoredRecommendation> scoredCandidates,
+            IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
+            int maxResults,
+            double diversityWeight)
+        {
+            var selected = new List<ScoredRecommendation>();
+            var remaining = new List<ScoredRecommendation>(scoredCandidates);
+            var maxSimToSelected = new Dictionary<Guid, float>(remaining.Count);
+            foreach (var candidate in remaining)
+            {
+                maxSimToSelected[candidate.ItemId] = 0f;
+            }
+
+            while (selected.Count < maxResults && remaining.Count > 0)
+            {
+                // Everyone left gets in regardless of order — no need to run MMR scoring.
+                if (remaining.Count <= maxResults - selected.Count)
+                {
+                    selected.AddRange(remaining.OrderByDescending(r => r.Score));
+                    break;
+                }
+
+                ScoredRecommendation best;
+                if (selected.Count == 0)
+                {
+                    // Seed pick: pure relevance, nothing to compare against yet.
+                    best = remaining.OrderByDescending(r => r.Score).First();
+                }
+                else
+                {
+                    best = remaining
+                        .OrderByDescending(r => ((1 - diversityWeight) * r.Score) - (diversityWeight * maxSimToSelected[r.ItemId]))
+                        .ThenByDescending(r => r.Score)
+                        .First();
+                }
+
+                remaining.Remove(best);
+                selected.Add(best);
+
+                var bestVector = embeddings[best.ItemId].Vector;
+                foreach (var candidate in remaining)
+                {
+                    var sim = VectorMath.CosineSimilarity(bestVector, embeddings[candidate.ItemId].Vector);
+                    if (sim > maxSimToSelected[candidate.ItemId])
+                    {
+                        maxSimToSelected[candidate.ItemId] = sim;
+                    }
+                }
+            }
+
+            return selected;
         }
 
         /// <summary>

@@ -25,6 +25,8 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             RecentWatchBoost = 1.0;
             EnableRatingProximity = true;
             RatingProximityWeight = 0.2;
+            EnableDiversityReranking = false;
+            DiversityWeight = 0.3;
             EnableDiagnosticLog = false;
             LeavingSoonEnabled = true;
             LeavingSoonMovieCount = 25;
@@ -102,6 +104,21 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         /// Default: 0.2 (20% rating proximity, 80% content similarity).
         /// </summary>
         public double RatingProximityWeight { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to trade some relevance for variety when selecting
+        /// recommendations, so franchise/sequel entries that share heavy actor/genre/tag overlap don't
+        /// dominate the list. When disabled, recommendations are the plain top-N by score, same as
+        /// before this setting existed. Default: false.
+        /// </summary>
+        public bool EnableDiversityReranking { get; set; }
+
+        /// <summary>
+        /// Gets or sets the weight given to diversity when <see cref="EnableDiversityReranking"/> is
+        /// enabled (0.0 to 1.0). 0.0 = pure relevance (identical to disabled), 1.0 = maximum diversity.
+        /// Default: 0.3.
+        /// </summary>
+        public double DiversityWeight { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to write a diagnostic log after each recommendation refresh.
@@ -192,6 +209,11 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             if (RatingProximityWeight < 0 || RatingProximityWeight > 1)
             {
                 errors.Add("RatingProximityWeight must be between 0.0 and 1.0");
+            }
+
+            if (DiversityWeight < 0 || DiversityWeight > 1)
+            {
+                errors.Add("DiversityWeight must be between 0.0 and 1.0");
             }
 
             if (LeavingSoonMovieCount < 0)

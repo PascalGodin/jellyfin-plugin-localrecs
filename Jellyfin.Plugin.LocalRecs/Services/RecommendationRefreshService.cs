@@ -551,6 +551,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var proximityLabel = config.EnableRatingProximity
                 ? $"on ({config.RatingProximityWeight:P0} blend)"
                 : "off";
+            var diversityLabel = config.EnableDiversityReranking
+                ? $"on (weight {config.DiversityWeight:F1})"
+                : "off";
             var actorsLabel = config.MaxVocabularyActors > 0 ? $"{config.MaxVocabularyActors} (limited)" : "unlimited";
             var directorsLabel = config.MaxVocabularyDirectors > 0 ? $"{config.MaxVocabularyDirectors} (limited)" : "unlimited";
             var tagsLabel = config.MaxVocabularyTags > 0 ? $"{config.MaxVocabularyTags} (limited)" : "unlimited";
@@ -563,6 +566,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"    Recency half-life  : {config.RecencyDecayHalfLifeDays:F0} d");
             sb.AppendLine($"    Recent watch emph. : {config.RecentWatchBoost:F1}");
             sb.AppendLine($"    Rating proximity   : {proximityLabel}");
+            sb.AppendLine($"    Diversity re-rank  : {diversityLabel}");
             sb.AppendLine("  Vocabulary limits:");
             sb.AppendLine($"    Actors             : {actorsLabel}");
             sb.AppendLine($"    Directors          : {directorsLabel}");

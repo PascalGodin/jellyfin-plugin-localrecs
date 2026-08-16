@@ -95,7 +95,21 @@
                             <input is="emby-input" type="number" id="ratingProximityWeight" name="ratingProximityWeight" min="0.0" max="1.0" step="0.05" />
                             <div class="fieldDescription">How much to blend rating similarity (0.0 = pure content match, 1.0 = pure rating match, default: 0.2)</div>
                         </div>
-                        
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="enableDiversityReranking" name="enableDiversityReranking" />
+                                <span>Enable Diversity Re-ranking</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Reduce clustering of franchise/sequel entries by trading a small amount of relevance for variety across genres, actors, and tags</div>
+                        </div>
+
+                        <div class="inputContainer" id="diversityWeightContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="diversityWeight">Diversity Weight:</label>
+                            <input is="emby-input" type="number" id="diversityWeight" name="diversityWeight" min="0.0" max="1.0" step="0.05" />
+                            <div class="fieldDescription">How much to favor variety over pure relevance (0.0 = pure relevance/today's behavior, 1.0 = maximum diversity, default: 0.3)</div>
+                        </div>
+
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="enableDiagnosticLog" name="enableDiagnosticLog" />
@@ -513,6 +527,8 @@
                             page.querySelector('#normalizeGenres').checked = config.NormalizeGenres !== undefined ? config.NormalizeGenres : true;
                             page.querySelector('#enableRatingProximity').checked = config.EnableRatingProximity || false;
                             page.querySelector('#ratingProximityWeight').value = config.RatingProximityWeight !== undefined ? config.RatingProximityWeight : 0.2;
+                            page.querySelector('#enableDiversityReranking').checked = config.EnableDiversityReranking || false;
+                            page.querySelector('#diversityWeight').value = config.DiversityWeight !== undefined ? config.DiversityWeight : 0.3;
                             page.querySelector('#enableDiagnosticLog').checked = config.EnableDiagnosticLog || false;
                             page.querySelector('#leavingSoonEnabled').checked = config.LeavingSoonEnabled !== undefined ? config.LeavingSoonEnabled : true;
                             page.querySelector('#leavingSoonMovieCount').value = config.LeavingSoonMovieCount !== undefined ? config.LeavingSoonMovieCount : 25;
@@ -536,6 +552,10 @@
                     var enableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                     var weightContainer = page.querySelector('#ratingProximityWeightContainer');
                     weightContainer.style.display = enableRatingProximity ? 'block' : 'none';
+
+                    var enableDiversityReranking = page.querySelector('#enableDiversityReranking').checked;
+                    var diversityWeightContainer = page.querySelector('#diversityWeightContainer');
+                    diversityWeightContainer.style.display = enableDiversityReranking ? 'block' : 'none';
 
                     var leavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
                     var leavingSoonContainer = page.querySelector('#leavingSoonSettingsContainer');
@@ -563,6 +583,8 @@
                             config.NormalizeGenres = page.querySelector('#normalizeGenres').checked;
                             config.EnableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                             config.RatingProximityWeight = parseFloat(page.querySelector('#ratingProximityWeight').value);
+                            config.EnableDiversityReranking = page.querySelector('#enableDiversityReranking').checked;
+                            config.DiversityWeight = parseFloat(page.querySelector('#diversityWeight').value);
                             config.EnableDiagnosticLog = page.querySelector('#enableDiagnosticLog').checked;
                             config.LeavingSoonEnabled = page.querySelector('#leavingSoonEnabled').checked;
                             config.LeavingSoonMovieCount = parseInt(page.querySelector('#leavingSoonMovieCount').value);
@@ -787,6 +809,10 @@
                 
                 // Setup event listeners for settings
                 page.querySelector('#enableRatingProximity').addEventListener('change', function() {
+                    LocalRecsConfig.updateFieldVisibility(page);
+                });
+
+                page.querySelector('#enableDiversityReranking').addEventListener('change', function() {
                     LocalRecsConfig.updateFieldVisibility(page);
                 });
 
