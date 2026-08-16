@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
     {
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<LibraryAnalysisService> _logger;
+        private int _lastGenresNormalizedCount;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LibraryAnalysisService"/> class.
@@ -35,12 +36,18 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>Gets the number of genre strings remapped by <see cref="GenreNormalizer"/> during the most recent <see cref="GetAllMediaItems"/> call.</summary>
+        public int LastGenresNormalizedCount => _lastGenresNormalizedCount;
+
         /// <summary>
         /// Gets all movies and TV series from the library as MediaItemMetadata objects.
         /// </summary>
+        /// <param name="normalizeGenres">Whether to collapse known localized genre variants (e.g. "Comédie") onto their canonical English form. Default: true.</param>
         /// <returns>List of media item metadata.</returns>
-        public IReadOnlyList<MediaItemMetadata> GetAllMediaItems()
+        public IReadOnlyList<MediaItemMetadata> GetAllMediaItems(bool normalizeGenres = true)
         {
+            _lastGenresNormalizedCount = 0;
+
             try
             {
                 var items = new List<MediaItemMetadata>();
@@ -55,7 +62,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 foreach (var movie in movies.OfType<Movie>())
                 {
-                    var metadata = ConvertToMetadata(movie, Models.MediaType.Movie);
+                    var metadata = ConvertToMetadata(movie, Models.MediaType.Movie, normalizeGenres);
                     if (metadata != null)
                     {
                         items.Add(metadata);
@@ -72,7 +79,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 foreach (var show in series.OfType<Series>())
                 {
-                    var metadata = ConvertToMetadata(show, Models.MediaType.Series);
+                    var metadata = ConvertToMetadata(show, Models.MediaType.Series, normalizeGenres);
                     if (metadata != null)
                     {
                         items.Add(metadata);
@@ -111,8 +118,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
                 return item switch
                 {
-                    Movie movie => ConvertToMetadata(movie, Models.MediaType.Movie),
-                    Series series => ConvertToMetadata(series, Models.MediaType.Series),
+                    Movie movie => ConvertToMetadata(movie, Models.MediaType.Movie, normalizeGenres: true),
+                    Series series => ConvertToMetadata(series, Models.MediaType.Series, normalizeGenres: true),
                     _ => null
                 };
             }
@@ -128,8 +135,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// </summary>
         /// <param name="item">The Jellyfin item.</param>
         /// <param name="mediaType">The media type.</param>
+        /// <param name="normalizeGenres">Whether to collapse known localized genre variants onto their canonical English form.</param>
         /// <returns>MediaItemMetadata or null if conversion fails.</returns>
-        private MediaItemMetadata? ConvertToMetadata(BaseItem item, Models.MediaType mediaType)
+        private MediaItemMetadata? ConvertToMetadata(BaseItem item, Models.MediaType mediaType, bool normalizeGenres)
         {
             if (item == null || string.IsNullOrEmpty(item.Name))
             {
@@ -152,16 +160,30 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             var metadata = new MediaItemMetadata(item.Id, item.Name, mediaType);
 
-            // Add genres, collapsing known localized variants (e.g. "Comédie") onto their
-            // canonical English form so mixed-locale libraries don't fragment the vocabulary.
+            // Add genres, optionally collapsing known localized variants (e.g. "Comédie") onto
+            // their canonical English form so mixed-locale libraries don't fragment the vocabulary.
             if (item.Genres != null)
             {
                 foreach (var genre in item.Genres)
                 {
-                    if (!string.IsNullOrWhiteSpace(genre))
+                    if (string.IsNullOrWhiteSpace(genre))
                     {
-                        metadata.AddGenre(GenreNormalizer.Normalize(genre));
+                        continue;
                     }
+
+                    if (!normalizeGenres)
+                    {
+                        metadata.AddGenre(genre);
+                        continue;
+                    }
+
+                    var normalized = GenreNormalizer.Normalize(genre);
+                    if (!string.Equals(normalized, genre, StringComparison.Ordinal))
+                    {
+                        _lastGenresNormalizedCount++;
+                    }
+
+                    metadata.AddGenre(normalized);
                 }
             }
 

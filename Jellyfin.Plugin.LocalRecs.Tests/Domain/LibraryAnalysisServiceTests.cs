@@ -228,6 +228,74 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             result[0].Genres.Should().BeEquivalentTo(new[] { "Action", "Drama" });
         }
 
+        [Fact]
+        public void GetAllMediaItems_NormalizeGenresDefault_CollapsesLocalizedVariant()
+        {
+            // Arrange
+            var movie = CreateMockMovie("Comédie Movie", 2020);
+            movie.Genres = new[] { "Comédie", "Action" };
+            SetupLibraryManagerReturns(new List<BaseItem> { movie }, new List<BaseItem>());
+
+            // Act: no argument — the default (true) should apply
+            var result = _service.GetAllMediaItems();
+
+            // Assert
+            result[0].Genres.Should().BeEquivalentTo(new[] { "Comedy", "Action" });
+            _service.LastGenresNormalizedCount.Should().Be(1);
+        }
+
+        [Fact]
+        public void GetAllMediaItems_NormalizeGenresFalse_LeavesLocalizedVariantUnchanged()
+        {
+            // Arrange
+            var movie = CreateMockMovie("Comédie Movie", 2020);
+            movie.Genres = new[] { "Comédie", "Action" };
+            SetupLibraryManagerReturns(new List<BaseItem> { movie }, new List<BaseItem>());
+
+            // Act
+            var result = _service.GetAllMediaItems(normalizeGenres: false);
+
+            // Assert
+            result[0].Genres.Should().BeEquivalentTo(new[] { "Comédie", "Action" });
+            _service.LastGenresNormalizedCount.Should().Be(0);
+        }
+
+        [Fact]
+        public void GetAllMediaItems_NormalizeGenresTrue_AlreadyCanonicalGenre_NotCountedAsNormalized()
+        {
+            // Arrange: nothing to normalize — the counter should stay at zero.
+            var movie = CreateMockMovie("Plain Movie", 2020);
+            movie.Genres = new[] { "Action", "Comedy" };
+            SetupLibraryManagerReturns(new List<BaseItem> { movie }, new List<BaseItem>());
+
+            // Act
+            _service.GetAllMediaItems(normalizeGenres: true);
+
+            // Assert
+            _service.LastGenresNormalizedCount.Should().Be(0);
+        }
+
+        [Fact]
+        public void GetAllMediaItems_LastGenresNormalizedCount_ResetsOnEachCall()
+        {
+            // Arrange
+            var frenchMovie = CreateMockMovie("Comédie Movie", 2020);
+            frenchMovie.Genres = new[] { "Comédie" };
+            SetupLibraryManagerReturns(new List<BaseItem> { frenchMovie }, new List<BaseItem>());
+            _service.GetAllMediaItems();
+            _service.LastGenresNormalizedCount.Should().Be(1);
+
+            var englishMovie = CreateMockMovie("Plain Movie", 2020);
+            englishMovie.Genres = new[] { "Action" };
+            SetupLibraryManagerReturns(new List<BaseItem> { englishMovie }, new List<BaseItem>());
+
+            // Act: a second call with nothing to normalize should not carry over the previous count
+            _service.GetAllMediaItems();
+
+            // Assert
+            _service.LastGenresNormalizedCount.Should().Be(0);
+        }
+
         #endregion
 
         #region ConvertToMetadata Tests - People (Actors/Directors)

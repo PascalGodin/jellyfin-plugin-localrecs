@@ -70,17 +70,18 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// Computes fresh embeddings for the library.
         /// Always recomputes to ensure recommendations reflect current watch history.
         /// </summary>
-        /// <returns>Tuple of embeddings, metadata, vocabulary, and per-phase durations.</returns>
-        public (IReadOnlyDictionary<Guid, ItemEmbedding> Embeddings, IReadOnlyDictionary<Guid, MediaItemMetadata> Metadata, FeatureVocabulary Vocabulary, TimeSpan LibraryScan, TimeSpan VocabularyBuild, TimeSpan EmbeddingCompute) ComputeEmbeddings()
+        /// <returns>Tuple of embeddings, metadata, vocabulary, per-phase durations, and the number of genre strings normalized.</returns>
+        public (IReadOnlyDictionary<Guid, ItemEmbedding> Embeddings, IReadOnlyDictionary<Guid, MediaItemMetadata> Metadata, FeatureVocabulary Vocabulary, TimeSpan LibraryScan, TimeSpan VocabularyBuild, TimeSpan EmbeddingCompute, int GenresNormalizedCount) ComputeEmbeddings()
         {
+            var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+
             var t0 = DateTime.UtcNow;
-            var library = _libraryAnalysisService.GetAllMediaItems();
+            var library = _libraryAnalysisService.GetAllMediaItems(config.NormalizeGenres);
+            var genresNormalizedCount = _libraryAnalysisService.LastGenresNormalizedCount;
             var metadata = library.ToDictionary(m => m.Id);
             var libraryScan = DateTime.UtcNow - t0;
 
             _logger.LogDebug("Computing fresh embeddings for {Count} items", library.Count);
-
-            var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
 
             var t1 = DateTime.UtcNow;
             var vocabulary = _vocabularyBuilder.BuildVocabulary(
@@ -96,7 +97,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             var embeddingsDict = embeddings.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-            return (embeddingsDict, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute);
+            return (embeddingsDict, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute, genresNormalizedCount);
         }
 
         /// <summary>
@@ -180,7 +181,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             _logger.LogInformation("Generating recommendations for {Count} users", userIds.Count);
 
-            var (embeddings, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute) = ComputeEmbeddings();
+            var (embeddings, metadata, vocabulary, libraryScan, vocabularyBuild, embeddingCompute, genresNormalizedCount) = ComputeEmbeddings();
 
             // Per-user data collected for the diagnostic log
             var userLogEntries = new List<(string Username, bool WarmStart, int WatchedCount,
@@ -301,7 +302,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             if (config.EnableDiagnosticLog)
             {
-                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, config, libraryScan, vocabularyBuild, embeddingCompute);
+                WriteDiagnosticLog(startTime, metadata, vocabulary, embeddings, userLogEntries, leavingSoonState, leavingSoonDiagnostics, config, libraryScan, vocabularyBuild, embeddingCompute, genresNormalizedCount);
             }
 
             return Task.FromResult((results, leavingSoonState, allItems));
@@ -526,7 +527,8 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             PluginConfiguration config,
             TimeSpan libraryScan,
             TimeSpan vocabularyBuild,
-            TimeSpan embeddingCompute)
+            TimeSpan embeddingCompute,
+            int genresNormalizedCount)
         {
             var totalDuration = DateTime.UtcNow - startTime;
             var movieCount = metadata.Values.Count(m => m.Type == MediaType.Movie);
@@ -565,6 +567,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"    Actors             : {actorsLabel}");
             sb.AppendLine($"    Directors          : {directorsLabel}");
             sb.AppendLine($"    Tags               : {tagsLabel}");
+            sb.AppendLine($"    Genre normalize    : {(config.NormalizeGenres ? "on" : "off")}");
             sb.AppendLine("  Leaving Soon:");
             sb.AppendLine($"    Enabled            : {(config.LeavingSoonEnabled ? "yes" : "no")}");
             sb.AppendLine($"    Min age            : {config.LeavingSoonMinAgeDays} d");
@@ -588,6 +591,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             sb.AppendLine($"  Tags       : {vocabulary.Tags.Count,4}");
             sb.AppendLine($"  Decades    : {vocabulary.Decades.Count,4}");
             sb.AppendLine($"  Dimensions : {embeddingDim,4}  (total)");
+            if (config.NormalizeGenres)
+            {
+                sb.AppendLine($"  Genres normalized : {genresNormalizedCount}  (localized variants collapsed to canonical form)");
+            }
+
             sb.AppendLine();
 
             // COVERAGE

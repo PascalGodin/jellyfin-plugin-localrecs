@@ -159,7 +159,15 @@
                             <input is="emby-input" type="number" id="maxVocabularyTags" name="maxVocabularyTags" min="0" max="5000" />
                             <div class="fieldDescription">Limit tag vocabulary size (0 = unlimited, default: 500)</div>
                         </div>
-                        
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="normalizeGenres" name="normalizeGenres" />
+                                <span>Normalize Localized Genre Names</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Collapse known translated genre variants (e.g. "Comédie" / "Comedy") onto a single canonical form, so libraries with mixed metadata languages don't fragment recommendation matching (default: on)</div>
+                        </div>
+
                         <br/>
                         <button is="emby-button" type="submit" class="raised button-submit block">
                             <span>Save</span>
@@ -502,6 +510,7 @@
                             page.querySelector('#maxVocabularyActors').value = config.MaxVocabularyActors !== undefined ? config.MaxVocabularyActors : 500;
                             page.querySelector('#maxVocabularyDirectors').value = config.MaxVocabularyDirectors !== undefined ? config.MaxVocabularyDirectors : 0;
                             page.querySelector('#maxVocabularyTags').value = config.MaxVocabularyTags !== undefined ? config.MaxVocabularyTags : 500;
+                            page.querySelector('#normalizeGenres').checked = config.NormalizeGenres !== undefined ? config.NormalizeGenres : true;
                             page.querySelector('#enableRatingProximity').checked = config.EnableRatingProximity || false;
                             page.querySelector('#ratingProximityWeight').value = config.RatingProximityWeight !== undefined ? config.RatingProximityWeight : 0.2;
                             page.querySelector('#enableDiagnosticLog').checked = config.EnableDiagnosticLog || false;
@@ -551,6 +560,7 @@
                             config.MaxVocabularyActors = parseInt(page.querySelector('#maxVocabularyActors').value);
                             config.MaxVocabularyDirectors = parseInt(page.querySelector('#maxVocabularyDirectors').value);
                             config.MaxVocabularyTags = parseInt(page.querySelector('#maxVocabularyTags').value);
+                            config.NormalizeGenres = page.querySelector('#normalizeGenres').checked;
                             config.EnableRatingProximity = page.querySelector('#enableRatingProximity').checked;
                             config.RatingProximityWeight = parseFloat(page.querySelector('#ratingProximityWeight').value);
                             config.EnableDiagnosticLog = page.querySelector('#enableDiagnosticLog').checked;

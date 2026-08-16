@@ -99,7 +99,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
 
                 var libraryStopwatch = Stopwatch.StartNew();
                 var library = await Task.Run(
-                    () => _libraryAnalysisService.GetAllMediaItems(),
+                    () => _libraryAnalysisService.GetAllMediaItems(config.NormalizeGenres),
                     cancellationToken).ConfigureAwait(false);
                 libraryStopwatch.Stop();
 

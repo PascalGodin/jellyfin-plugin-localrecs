@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
             MaxVocabularyActors = 500;
             MaxVocabularyDirectors = 0;
             MaxVocabularyTags = 500;
+            NormalizeGenres = true;
             RecentWatchBoost = 1.0;
             EnableRatingProximity = true;
             RatingProximityWeight = 0.2;
@@ -71,6 +72,15 @@ namespace Jellyfin.Plugin.LocalRecs.Configuration
         /// Gets or sets the maximum vocabulary size for tags (0 = unlimited).
         /// </summary>
         public int MaxVocabularyTags { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether known localized genre name variants (e.g. TMDB's
+        /// French translations, such as "Comédie") are collapsed onto a single canonical English form
+        /// before being added to the vocabulary. Disable this if you've fixed the root cause (e.g. a
+        /// per-library metadata language override) and want to see raw genre strings as Jellyfin reports
+        /// them. Default: true.
+        /// </summary>
+        public bool NormalizeGenres { get; set; }
 
         /// <summary>
         /// Gets or sets the recent recent watch boost scalar.
