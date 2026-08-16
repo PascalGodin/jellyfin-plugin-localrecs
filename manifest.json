@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.26",
+        "changelog": "Fix: diversity re-ranking's relevance floor didn't help when a whole candidate pool was uniformly weak, not just a small low-relevance tail\n- v0.6.1.25's fix (bound the pool to the top maxResults x 3 candidates) only helps when there's a clear cliff between relevant and irrelevant candidates; a before/after comparison at the same weight showed byte-identical output on one user's TV list, because that pool's relevance scores were narrowly compressed end-to-end (roughly 0.17-0.24) with no cliff to cut at\n- Root cause: the diversity penalty and the relevance score were blended on the same raw 0-1 scale, so a pool with a naturally narrow relevance spread let the penalty dominate far more than the configured weight implied, while a wide-spread pool (movies) behaved as intended\n- Fix: min-max normalize relevance scores within the candidate pool before blending with the diversity penalty, so a given weight trades off relevance for variety consistently regardless of how spread out or compressed the pool's raw scores happen to be\n- Added a regression test with a narrow, noise-dominated relevance spread proving a gentle weight (0.1) still keeps most of the plain-relevance ranking intact",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.26/jellyfin-plugin-localrecs-v0.6.1.26.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-08-16T00:00:00Z"
+      },
+      {
         "version": "0.6.1.25",
         "changelog": "Fix: diversity re-ranking could select very low-relevance items on candidate pools with little relevance spread\n- Root cause: pure MMR has no lower bound on relevance, so when a candidate pool's scores are tightly clustered (observed on one user's TV recommendations: 76% of the list changed at the default weight, including several picks around 3% content match with no real thematic connection), the diversity term can dominate the selection almost entirely and reach for items that are merely \"different,\" not genuinely relevant\n- Fix: bound the pool diversity re-ranking picks from to the top (maxResults x 3) candidates by relevance before running MMR, so it can no longer reach past a reasonable relevance floor regardless of weight\n- Cases with real relevance spread (most users, most media types) are unaffected \u2014 the fix only changes behavior when the candidate pool would otherwise force a reach into low-relevance territory\n- Added a regression test with a large low-relevance \"junk\" candidate tier proving diversity weight 1.0 (maximum diversity) never selects outside the bounded relevance pool",
         "targetAbi": "10.11.9.0",

@@ -419,16 +419,20 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
         /// <summary>
         /// Selects the top <paramref name="maxResults"/> candidates using greedy Maximal Marginal
-        /// Relevance: each pick after the first trades off raw relevance (<see cref="ScoredRecommendation.Score"/>)
-        /// against similarity to items already selected, so franchise/sequel clusters that share heavy
-        /// actor/genre/tag overlap don't dominate the list the way plain score-descending selection allows.
-        /// The pool MMR picks from is first bounded to the top <see cref="DiversityCandidatePoolMultiplier"/>
-        /// × <paramref name="maxResults"/> candidates by relevance, so a weak candidate pool (little
-        /// separation between the best and worst matches) can't cause diversity to reach past a
-        /// reasonable relevance floor purely because something is "different" from what's already picked.
-        /// Every candidate is guaranteed to have an entry in <paramref name="embeddings"/>, since
-        /// <paramref name="scoredCandidates"/> is only ever built from candidates that already passed an
-        /// embeddings lookup.
+        /// Relevance: each pick after the first trades off relevance (<see cref="ScoredRecommendation.Score"/>,
+        /// min-max normalized within the pool) against similarity to items already selected, so
+        /// franchise/sequel clusters that share heavy actor/genre/tag overlap don't dominate the list
+        /// the way plain score-descending selection allows. Normalizing relevance before blending it
+        /// with the diversity penalty keeps a given weight behaving consistently regardless of whether
+        /// the pool's raw scores happen to be widely spread or naturally compressed (e.g. a user's TV
+        /// candidates all weakly matching a narrow taste profile) — without it, a compressed pool lets
+        /// the penalty dominate far more than the configured weight implies. The pool MMR picks from is
+        /// also first bounded to the top <see cref="DiversityCandidatePoolMultiplier"/> ×
+        /// <paramref name="maxResults"/> candidates by relevance, as a hard backstop so diversity can
+        /// never reach a candidate with little to no real taste match purely because it's "different"
+        /// from what's already picked. Every candidate is guaranteed to have an entry in
+        /// <paramref name="embeddings"/>, since <paramref name="scoredCandidates"/> is only ever built
+        /// from candidates that already passed an embeddings lookup.
         /// </summary>
         /// <param name="scoredCandidates">All scored candidates for this request.</param>
         /// <param name="embeddings">Item embeddings, used to compute similarity between candidates.</param>
@@ -445,6 +449,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var pool = scoredCandidates.Count > poolSize
                 ? scoredCandidates.OrderByDescending(r => r.Score).Take(poolSize).ToList()
                 : scoredCandidates;
+
+            // Min-max normalize relevance within the pool before blending with the diversity
+            // penalty. Without this, a pool whose raw scores are naturally compressed (e.g. a
+            // user's TV candidates all weakly matching a narrow taste profile) lets the diversity
+            // term dominate far more than the configured weight implies, since the penalty and
+            // the relevance signal aren't on comparable scales. Normalizing means a given weight
+            // behaves consistently regardless of how spread out or compressed the pool's raw
+            // scores happen to be.
+            var poolMin = pool.Min(r => r.Score);
+            var poolRange = pool.Max(r => r.Score) - poolMin;
+
+            float NormalizedScore(ScoredRecommendation r) =>
+                poolRange > 0f ? (r.Score - poolMin) / poolRange : 0f;
 
             var selected = new List<ScoredRecommendation>();
             var remaining = new List<ScoredRecommendation>(pool);
@@ -472,7 +489,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 else
                 {
                     best = remaining
-                        .OrderByDescending(r => ((1 - diversityWeight) * r.Score) - (diversityWeight * maxSimToSelected[r.ItemId]))
+                        .OrderByDescending(r => ((1 - diversityWeight) * NormalizedScore(r)) - (diversityWeight * maxSimToSelected[r.ItemId]))
                         .ThenByDescending(r => r.Score)
                         .First();
                 }

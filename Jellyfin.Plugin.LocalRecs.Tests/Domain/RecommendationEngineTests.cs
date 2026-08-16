@@ -754,6 +754,69 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             recommendations.Should().NotContain(r => junkIds.Contains(r.ItemId));
         }
 
+        [Fact]
+        public void GenerateRecommendations_NarrowRelevanceSpreadPool_GentleWeightStaysCloseToRelevanceOrder()
+        {
+            // Arrange: a pool where every candidate shares no genre with the profile at all, so raw
+            // cosine similarity — and therefore Score — barely varies between them. This mirrors the
+            // real-world case that motivated score normalization: a user's TV candidates all weakly
+            // matching a narrow taste profile, where an un-normalized diversity penalty could dominate
+            // far more than a "gentle" weight implies because the raw relevance spread is tiny.
+            var library = new List<MediaItemMetadata>();
+            var watchedIds = new List<Guid>();
+            for (int i = 0; i < 3; i++)
+            {
+                var watched = new MediaItemMetadata(Guid.NewGuid(), $"Watched Horror Seed {i}", MediaType.Movie);
+                watched.AddGenre("Horror");
+                library.Add(watched);
+                watchedIds.Add(watched.Id);
+            }
+
+            // None of these share "Horror" with the profile, and each has a different genre from the
+            // others too, so both relevance and inter-candidate similarity are weak and noise-driven.
+            var candidateGenres = new[] { "Action", "Drama", "Comedy", "Thriller", "Crime", "Adventure", "Fantasy", "Romance" };
+            foreach (var genre in candidateGenres)
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"{genre} Candidate", MediaType.Movie);
+                item.AddGenre(genre);
+                library.Add(item);
+            }
+
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = false;
+            var plainTop3 = _engine.GenerateRecommendations(
+                _testUserId, userProfile, embeddings, metadata, _config, maxResults: 3)
+                .Select(r => r.ItemId)
+                .ToList();
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 0.1;
+
+            // Act
+            var diversityTop3 = _engine.GenerateRecommendations(
+                _testUserId, userProfile, embeddings, metadata, _config, maxResults: 3)
+                .Select(r => r.ItemId)
+                .ToList();
+
+            // Assert: at a gentle weight, normalized relevance should still dominate — at least 2 of
+            // the 3 plain-relevance picks should survive, even though raw scores barely varied
+            diversityTop3.Intersect(plainTop3).Should().HaveCountGreaterOrEqualTo(2);
+        }
+
         #endregion
 
         // Helper Methods
