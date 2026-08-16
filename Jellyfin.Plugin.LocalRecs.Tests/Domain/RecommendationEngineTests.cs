@@ -683,6 +683,77 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             recommendations.Select(r => r.ItemId).Should().BeEquivalentTo(candidateIds);
         }
 
+        [Fact]
+        public void GenerateRecommendations_DiversityWeightOne_NeverSelectsCandidateOutsideRelevancePool()
+        {
+            // Arrange: a candidate pool shaped like the real-world regression this guards against —
+            // plenty of genuinely relevant candidates (more than the pool cap alone), plus a much
+            // larger set of "junk" candidates that share nothing with the user's taste. Pure-diversity
+            // MMR (weight 1.0) would happily reach for junk purely because it's maximally different
+            // from everything already selected, unless the candidate pool is bounded first.
+            var library = new List<MediaItemMetadata>();
+            var watchedIds = new List<Guid>();
+            for (int i = 0; i < 3; i++)
+            {
+                var watched = new MediaItemMetadata(Guid.NewGuid(), $"Watched Seed {i}", MediaType.Movie);
+                watched.AddGenre("Action");
+                library.Add(watched);
+                watchedIds.Add(watched.Id);
+            }
+
+            // 35 relevant candidates — more than the pool cap (maxResults 10 × multiplier 3 = 30) on
+            // their own, so the cap has to actually cut into this tier, not just exclude the junk.
+            var relevantIds = new List<Guid>();
+            for (int i = 0; i < 35; i++)
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"Relevant {i}", MediaType.Movie);
+                item.AddGenre("Action");
+                library.Add(item);
+                relevantIds.Add(item.Id);
+            }
+
+            // 20 junk candidates tagged with genres outside CreateEmbeddings' known dimension map, so
+            // they carry essentially no signal toward this user's taste vector.
+            var junkIds = new List<Guid>();
+            for (int i = 0; i < 20; i++)
+            {
+                var item = new MediaItemMetadata(Guid.NewGuid(), $"Junk {i}", MediaType.Movie);
+                item.AddGenre($"Unrecognized{i}");
+                library.Add(item);
+                junkIds.Add(item.Id);
+            }
+
+            var embeddings = CreateEmbeddings(library);
+            var metadata = library.ToDictionary(i => i.Id, i => i);
+
+            foreach (var id in watchedIds)
+            {
+                SetupWatchedItem(metadata[id]);
+            }
+
+            foreach (var item in library.Where(m => !watchedIds.Contains(m.Id)))
+            {
+                SetupUnwatchedItem(item);
+            }
+
+            var userProfile = CreateGenericUserProfile(embeddings, watchedIds);
+
+            _config.EnableDiversityReranking = true;
+            _config.DiversityWeight = 1.0;
+
+            // Act
+            var recommendations = _engine.GenerateRecommendations(
+                _testUserId,
+                userProfile,
+                embeddings,
+                metadata,
+                _config,
+                maxResults: 10);
+
+            // Assert: even at maximum diversity, nothing from the junk tier should ever be reachable
+            recommendations.Should().NotContain(r => junkIds.Contains(r.ItemId));
+        }
+
         #endregion
 
         // Helper Methods

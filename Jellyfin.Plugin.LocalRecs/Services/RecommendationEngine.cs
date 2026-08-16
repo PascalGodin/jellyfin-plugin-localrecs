@@ -20,6 +20,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
     /// </summary>
     public class RecommendationEngine
     {
+        /// <summary>
+        /// How many times <c>maxResults</c> worth of top-relevance candidates diversity re-ranking is
+        /// allowed to pick from. Bounds the pool so diversity can never reach past a reasonable
+        /// relevance floor to select something with little to no real taste match just because it's
+        /// maximally different from everything already selected — see <see cref="ApplyDiversityReranking"/>.
+        /// </summary>
+        private const int DiversityCandidatePoolMultiplier = 3;
+
         private readonly IUserDataManager _userDataManager;
         private readonly IUserManager _userManager;
         private readonly ILibraryManager _libraryManager;
@@ -414,6 +422,10 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// Relevance: each pick after the first trades off raw relevance (<see cref="ScoredRecommendation.Score"/>)
         /// against similarity to items already selected, so franchise/sequel clusters that share heavy
         /// actor/genre/tag overlap don't dominate the list the way plain score-descending selection allows.
+        /// The pool MMR picks from is first bounded to the top <see cref="DiversityCandidatePoolMultiplier"/>
+        /// × <paramref name="maxResults"/> candidates by relevance, so a weak candidate pool (little
+        /// separation between the best and worst matches) can't cause diversity to reach past a
+        /// reasonable relevance floor purely because something is "different" from what's already picked.
         /// Every candidate is guaranteed to have an entry in <paramref name="embeddings"/>, since
         /// <paramref name="scoredCandidates"/> is only ever built from candidates that already passed an
         /// embeddings lookup.
@@ -429,8 +441,13 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             int maxResults,
             double diversityWeight)
         {
+            var poolSize = maxResults * DiversityCandidatePoolMultiplier;
+            var pool = scoredCandidates.Count > poolSize
+                ? scoredCandidates.OrderByDescending(r => r.Score).Take(poolSize).ToList()
+                : scoredCandidates;
+
             var selected = new List<ScoredRecommendation>();
-            var remaining = new List<ScoredRecommendation>(scoredCandidates);
+            var remaining = new List<ScoredRecommendation>(pool);
             var maxSimToSelected = new Dictionary<Guid, float>(remaining.Count);
             foreach (var candidate in remaining)
             {
