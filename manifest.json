@@ -8,10 +8,10 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.6.1.19",
-        "changelog": "Fix: Leaving Soon could flag an item that was simultaneously being recommended to a user\n- Root cause: recommendations blend content similarity with rating proximity (0.8x cosine + 0.2x rating closeness to the user's average), but Leaving Soon compared raw content-only cosine similarity across users, so an item with weak content overlap but a rating close to someone's average could rank in their recommendations while still looking like the worst taste match to the whole household\n- Extracted the blending formula into a shared TasteScoring.Compute() utility used by both RecommendationEngine and LeavingSoonService, so the two features now agree on what counts as a taste match\n- Added a regression test verifying an item whose rating matches the household average is protected from Leaving Soon while an otherwise-identical item with a divergent rating is flagged instead",
+        "version": "0.6.1.20",
+        "changelog": "Fix: Leaving Soon could flag an item that was simultaneously being recommended to a user\n- Root cause: recommendations blend content similarity with rating proximity (0.8x cosine + 0.2x rating closeness to the user's average), but Leaving Soon compared raw content-only cosine similarity across users, so an item with weak content overlap but a rating close to someone's average could rank in their recommendations while still looking like the worst taste match to the whole household\n- Extracted the blending formula into a shared TasteScoring.Compute() utility used by both RecommendationEngine and LeavingSoonService, so the two features now agree on what counts as a taste match\n- Added a regression test verifying an item whose rating matches the household average is protected from Leaving Soon while an otherwise-identical item with a divergent rating is flagged instead\n- v0.6.1.19 failed CI (StyleCop SA1649/SA1402: two types sharing one file) and was never released; this version splits TasteScore into its own file",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.19/jellyfin-plugin-localrecs-v0.6.1.19.zip",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.20/jellyfin-plugin-localrecs-v0.6.1.20.zip",
         "checksum": "00000000000000000000000000000000",
         "timestamp": "2026-08-16T00:00:00Z"
       },
