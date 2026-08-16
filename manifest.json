@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.1.23",
-        "changelog": "Improvement: make genre normalization configurable and observable\n- Added a \"Normalize Localized Genre Names\" toggle (Settings > Performance Tuning), backed by PluginConfiguration.NormalizeGenres (default: on) — useful once you've fixed the root cause (e.g. a per-library metadata language override) and want to see raw genre strings, or want an early warning if it creeps back\n- LibraryAnalysisService now exposes LastGenresNormalizedCount; the diagnostic log's VOCABULARY section shows how many genre strings were actually remapped this run, and CONFIG shows whether the toggle is on/off\n- GetAllMediaItems() and ConvertToMetadata() take an explicit normalizeGenres flag instead of always normalizing; existing callers default to the previous always-on behavior\n- Added tests covering the toggle in both states, the pass-through case for already-canonical genres, and that the counter resets between calls",
+        "changelog": "Improvement: make genre normalization configurable and observable\n- Added a \"Normalize Localized Genre Names\" toggle (Settings > Performance Tuning), backed by PluginConfiguration.NormalizeGenres (default: on) \u2014 useful once you've fixed the root cause (e.g. a per-library metadata language override) and want to see raw genre strings, or want an early warning if it creeps back\n- LibraryAnalysisService now exposes LastGenresNormalizedCount; the diagnostic log's VOCABULARY section shows how many genre strings were actually remapped this run, and CONFIG shows whether the toggle is on/off\n- GetAllMediaItems() and ConvertToMetadata() take an explicit normalizeGenres flag instead of always normalizing; existing callers default to the previous always-on behavior\n- Added tests covering the toggle in both states, the pass-through case for already-canonical genres, and that the counter resets between calls",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.23/jellyfin-plugin-localrecs-v0.6.1.23.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "81de188b52ca94c3f37523ab3bdc3fed",
         "timestamp": "2026-08-16T00:00:00Z"
       },
       {
