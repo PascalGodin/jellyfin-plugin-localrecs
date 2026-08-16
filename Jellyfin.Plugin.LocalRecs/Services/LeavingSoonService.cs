@@ -15,8 +15,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 {
     /// <summary>
     /// Manages the Leaving Soon and Removal Candidates item lists.
-    /// Items with the lowest max-user cosine similarity are flagged as Leaving Soon.
-    /// After a configurable dwell period they are promoted to Removal Candidates.
+    /// Items with the lowest max-user taste score (the same content+rating blend used for
+    /// recommendations) are flagged as Leaving Soon. After a configurable dwell period they
+    /// are promoted to Removal Candidates.
     /// Virtual library creation is handled separately; this service only scores and tracks state.
     /// </summary>
     public class LeavingSoonService
@@ -221,13 +222,24 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     : timeSinceAdded;
                 double daysUntilEligible = effectiveAge >= minAge ? 0 : (minAge - effectiveAge).TotalDays;
 
+                // Use the same content+rating blend as recommendations, so an item that scores
+                // well enough to be recommended to someone can't simultaneously look like the
+                // worst taste match to everyone and get flagged for removal.
                 var maxSimilarity = 0f;
                 foreach (var profile in eligibleProfiles)
                 {
-                    var sim = VectorMath.CosineSimilarity(profile.TasteVector, embedding.Vector);
-                    if (sim > maxSimilarity)
+                    var score = TasteScoring.Compute(
+                        profile.TasteVector,
+                        profile.AverageCommunityRating,
+                        profile.AverageCriticRating,
+                        embedding.Vector,
+                        meta.CommunityRating,
+                        meta.CriticRating,
+                        config.EnableRatingProximity,
+                        config.RatingProximityWeight).FinalScore;
+                    if (score > maxSimilarity)
                     {
-                        maxSimilarity = sim;
+                        maxSimilarity = score;
                     }
                 }
 

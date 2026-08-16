@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.19",
+        "changelog": "Fix: Leaving Soon could flag an item that was simultaneously being recommended to a user\n- Root cause: recommendations blend content similarity with rating proximity (0.8x cosine + 0.2x rating closeness to the user's average), but Leaving Soon compared raw content-only cosine similarity across users, so an item with weak content overlap but a rating close to someone's average could rank in their recommendations while still looking like the worst taste match to the whole household\n- Extracted the blending formula into a shared TasteScoring.Compute() utility used by both RecommendationEngine and LeavingSoonService, so the two features now agree on what counts as a taste match\n- Added a regression test verifying an item whose rating matches the household average is protected from Leaving Soon while an otherwise-identical item with a divergent rating is flagged instead",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.19/jellyfin-plugin-localrecs-v0.6.1.19.zip",
+        "checksum": "00000000000000000000000000000000",
+        "timestamp": "2026-08-16T00:00:00Z"
+      },
+      {
         "version": "0.6.1.18",
         "changelog": "Fix: assembly version was not bumped alongside the v0.6.1.17 manifest entry, causing Jellyfin to report the plugin as still on 0.6.1.16 after install\n- Bump csproj Version/AssemblyVersion/FileVersion to match the release tag\n- No functional changes beyond v0.6.1.17 (Pass 3 RemovalCandidates cleanup, test suite fixes)",
         "targetAbi": "10.11.9.0",

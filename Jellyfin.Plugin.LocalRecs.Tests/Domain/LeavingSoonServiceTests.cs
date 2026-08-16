@@ -455,6 +455,76 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         }
 
         [Fact]
+        public void Refresh_Scoring_UsesBlendedScoreLikeRecommendations()
+        {
+            // Regression test: an item that would score well enough via rating proximity to be
+            // recommended to a user must not simultaneously look like the worst content match and
+            // get flagged for removal. Two items are given identical (zero) cosine similarity to the
+            // profile's taste vector, differing only in how close their community rating is to the
+            // profile's average. With rating proximity blended in (the default), the item whose
+            // rating is far from the average should be flagged instead of the one whose rating matches.
+            var service = CreateService();
+            const int dim = 10;
+
+            var nearId = Guid.NewGuid();
+            var farId = Guid.NewGuid();
+
+            var library = new List<MediaItemMetadata>
+            {
+                new MediaItemMetadata(nearId, "Rating Near Average", MediaType.Movie)
+                {
+                    ReleaseYear = 2020, CommunityRating = 8.0f
+                },
+                new MediaItemMetadata(farId, "Rating Far From Average", MediaType.Movie)
+                {
+                    ReleaseYear = 2020, CommunityRating = 0.0f
+                }
+            };
+            foreach (var meta in library)
+            {
+                meta.AddGenre("Action");
+                MockLibraryItem(meta);
+            }
+
+            // Both items are orthogonal to the profile's taste vector, so raw cosine similarity is 0
+            // for both — content alone cannot distinguish them.
+            var nearVector = new float[dim];
+            nearVector[1] = 1.0f;
+            var farVector = new float[dim];
+            farVector[1] = 1.0f;
+            var embeddings = new Dictionary<Guid, ItemEmbedding>
+            {
+                [nearId] = new ItemEmbedding(nearId, nearVector),
+                [farId] = new ItemEmbedding(farId, farVector)
+            };
+
+            var tasteVector = new float[dim];
+            tasteVector[0] = 1.0f;
+            var profile = new UserProfile(Guid.NewGuid(), tasteVector)
+            {
+                WatchedItemCount = 5,
+                AverageCommunityRating = 8.0f
+            };
+
+            var config = DefaultConfig(movieCount: 1, dwellDays: 1, minAgeDays: 0);
+            config.EnableRatingProximity.Should().BeTrue("rating proximity blending is on by default");
+
+            var watchStatus = new Dictionary<Guid, (DateTime?, bool)>
+            {
+                [nearId] = (DateTime.UtcNow.AddDays(-60), false),
+                [farId] = (DateTime.UtcNow.AddDays(-60), false)
+            };
+
+            // Act
+            var (state, _) = service.Refresh(library, embeddings, new List<UserProfile> { profile }, watchStatus, config, default);
+
+            // Assert: the item whose rating diverges from the household average is flagged;
+            // the one matching the average (which would also score better as a recommendation) is not.
+            state.FlaggedItems.Should().ContainKey(farId.ToString());
+            state.FlaggedItems.Should().NotContainKey(nearId.ToString());
+        }
+
+        [Fact]
         public void Refresh_SkippedAlreadyRemoval_IncrementsDiagCounter()
         {
             var service = CreateService();

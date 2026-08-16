@@ -388,57 +388,22 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             MediaItemMetadata itemMetadata,
             PluginConfiguration config)
         {
-            // Compute cosine similarity between user taste vector and item embedding
-            var cosineSimilarity = VectorMath.CosineSimilarity(
+            var score = TasteScoring.Compute(
                 userProfile.TasteVector,
-                candidateEmbedding.Vector);
+                userProfile.AverageCommunityRating,
+                userProfile.AverageCriticRating,
+                candidateEmbedding.Vector,
+                itemMetadata.CommunityRating,
+                itemMetadata.CriticRating,
+                config.EnableRatingProximity,
+                config.RatingProximityWeight);
 
-            // If rating proximity is disabled, return pure cosine similarity
-            if (!config.EnableRatingProximity)
+            return new ScoredRecommendation(candidateEmbedding.ItemId, score.FinalScore)
             {
-                return new ScoredRecommendation(candidateEmbedding.ItemId, cosineSimilarity)
-                {
-                    CosineSimilarity = cosineSimilarity,
-                    ItemCommunityRating = itemMetadata.CommunityRating,
-                    ItemCriticRating = itemMetadata.CriticRating
-                };
-            }
-
-            // Compute rating proximity components
-            double communityProximity = 0.5; // neutral default
-            double criticProximity = 0.5;    // neutral default
-
-            // Community rating proximity (if both user and item have community ratings)
-            if (itemMetadata.CommunityRating.HasValue && userProfile.AverageCommunityRating.HasValue)
-            {
-                var diff = Math.Abs(itemMetadata.CommunityRating.Value - userProfile.AverageCommunityRating.Value);
-
-                // Community rating is 0-10 scale
-                communityProximity = Math.Max(0, 1.0 - (diff / 10.0));
-            }
-
-            // Critic rating proximity (if both user and item have critic ratings)
-            if (itemMetadata.CriticRating.HasValue && userProfile.AverageCriticRating.HasValue)
-            {
-                var diff = Math.Abs(itemMetadata.CriticRating.Value - userProfile.AverageCriticRating.Value);
-
-                // Critic rating is 0-100 scale
-                criticProximity = Math.Max(0, 1.0 - (diff / 100.0));
-            }
-
-            // Average the two rating proximities
-            var ratingProximity = (communityProximity + criticProximity) / 2.0;
-
-            // Blend cosine similarity with rating proximity
-            var finalScore = ((1 - config.RatingProximityWeight) * cosineSimilarity)
-                           + (config.RatingProximityWeight * ratingProximity);
-
-            return new ScoredRecommendation(candidateEmbedding.ItemId, (float)finalScore)
-            {
-                CosineSimilarity = cosineSimilarity,
-                CommunityProximity = (float)communityProximity,
-                CriticProximity = (float)criticProximity,
-                RatingProximity = (float)ratingProximity,
+                CosineSimilarity = score.CosineSimilarity,
+                CommunityProximity = score.CommunityProximity,
+                CriticProximity = score.CriticProximity,
+                RatingProximity = score.RatingProximity,
                 ItemCommunityRating = itemMetadata.CommunityRating,
                 ItemCriticRating = itemMetadata.CriticRating
             };
