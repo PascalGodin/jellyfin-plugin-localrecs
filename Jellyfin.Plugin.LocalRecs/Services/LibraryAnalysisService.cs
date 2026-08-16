@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.LocalRecs.Models;
+using Jellyfin.Plugin.LocalRecs.Utilities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -151,14 +152,15 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             var metadata = new MediaItemMetadata(item.Id, item.Name, mediaType);
 
-            // Add genres
+            // Add genres, collapsing known localized variants (e.g. "Comédie") onto their
+            // canonical English form so mixed-locale libraries don't fragment the vocabulary.
             if (item.Genres != null)
             {
                 foreach (var genre in item.Genres)
                 {
                     if (!string.IsNullOrWhiteSpace(genre))
                     {
-                        metadata.AddGenre(genre);
+                        metadata.AddGenre(GenreNormalizer.Normalize(genre));
                     }
                 }
             }
