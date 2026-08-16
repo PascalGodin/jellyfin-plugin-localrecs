@@ -51,6 +51,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
         /// <param name="embeddings">Pre-computed item embeddings.</param>
         /// <param name="eligibleProfiles">Pre-computed taste profiles for users with enough watch history.</param>
         /// <param name="watchStatus">Aggregated watch status across all users, keyed by item ID.</param>
+        /// <param name="recommendedItemIds">Item IDs currently appearing in any user's recommendation list this run; these are never flagged.</param>
         /// <param name="config">Plugin configuration.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Updated Leaving Soon state and discovery diagnostics after this run.</returns>
@@ -59,6 +60,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
             IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
+            IReadOnlySet<Guid> recommendedItemIds,
             PluginConfiguration config,
             CancellationToken cancellationToken)
         {
@@ -80,6 +82,11 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             if (watchStatus == null)
             {
                 throw new ArgumentNullException(nameof(watchStatus));
+            }
+
+            if (recommendedItemIds == null)
+            {
+                throw new ArgumentNullException(nameof(recommendedItemIds));
             }
 
             if (config == null)
@@ -104,7 +111,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             LeavingSoonDiagnostics diagnostics;
             if (eligibleProfiles.Count > 0)
             {
-                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, watchStatus, config, minAge, now);
+                diagnostics = Discover(state, allItems, embeddings, eligibleProfiles, watchStatus, recommendedItemIds, config, minAge, now);
             }
             else
             {
@@ -166,6 +173,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             IReadOnlyDictionary<Guid, ItemEmbedding> embeddings,
             IReadOnlyList<UserProfile> eligibleProfiles,
             IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
+            IReadOnlySet<Guid> recommendedItemIds,
             PluginConfiguration config,
             TimeSpan minAge,
             DateTime now)
@@ -205,6 +213,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 if (ws.IsAnyFavorite)
                 {
                     diag.SkippedAlwaysSafe++;
+                    continue;
+                }
+
+                // An item currently sitting in someone's recommendation list is, by definition, not
+                // a removal candidate this run — regardless of how it scores against the household.
+                if (recommendedItemIds.Contains(meta.Id))
+                {
+                    diag.SkippedCurrentlyRecommended++;
                     continue;
                 }
 

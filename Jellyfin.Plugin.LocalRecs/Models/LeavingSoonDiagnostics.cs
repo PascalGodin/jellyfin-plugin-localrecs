@@ -23,6 +23,9 @@ namespace Jellyfin.Plugin.LocalRecs.Models
         /// <summary>Gets or sets items skipped because they are favorited by any user.</summary>
         public int SkippedAlwaysSafe { get; set; }
 
+        /// <summary>Gets or sets items skipped because they appear in a user's current recommendation list.</summary>
+        public int SkippedCurrentlyRecommended { get; set; }
+
         /// <summary>Gets or sets the count of worst-X candidates that failed the age gate.</summary>
         public int SkippedTooYoung { get; set; }
 

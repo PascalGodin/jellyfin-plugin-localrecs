@@ -280,11 +280,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     .Select(e => e.Profile!)
                     .ToList();
 
+                // Anything currently recommended to any user this run is protected from Leaving Soon,
+                // regardless of how it scores — the two features must never disagree about an item at
+                // the same time.
+                var recommendedItemIds = (IReadOnlySet<Guid>)results.Values
+                    .SelectMany(r => r.Movies.Select(m => m.ItemId).Concat(r.Tv.Select(t => t.ItemId)))
+                    .ToHashSet();
+
                 var lsResult = _leavingSoonService.Refresh(
                     allItems,
                     embeddings,
                     eligibleProfiles,
                     watchStatus,
+                    recommendedItemIds,
                     config,
                     System.Threading.CancellationToken.None);
                 leavingSoonState = lsResult.State;
@@ -716,6 +724,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                     sb.AppendLine($"      No metadata      : {leavingSoonDiagnostics.SkippedNoMetadata}");
                     sb.AppendLine($"      No embedding     : {leavingSoonDiagnostics.SkippedNoEmbedding}");
                     sb.AppendLine($"      Favorited        : {leavingSoonDiagnostics.SkippedAlwaysSafe}");
+                    sb.AppendLine($"      Recommended      : {leavingSoonDiagnostics.SkippedCurrentlyRecommended}");
                     sb.AppendLine($"      Too young (<{config.LeavingSoonMinAgeDays}d): {leavingSoonDiagnostics.SkippedTooYoung}");
                     sb.AppendLine($"      Not found        : {leavingSoonDiagnostics.SkippedNotFound}");
                     sb.AppendLine($"      Unknown type     : {leavingSoonDiagnostics.SkippedUnknownType}");
