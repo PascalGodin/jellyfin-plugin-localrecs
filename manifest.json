@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.1.22",
-        "changelog": "Improvement: normalize localized genre names so mixed-language libraries don't fragment recommendation matching\n- Root cause: TMDB metadata pulled in different provider locales gives some items \"Comedy\"/\"Adventure\"/\"Mystery\" and others \"Comédie\"/\"Aventure\"/\"Mystère\" for the same genre; since the embedding vocabulary has one dimension per distinct genre string, these were treated as entirely unrelated genres, diluting the content-similarity signal for any user whose library mixes locales\n- Added GenreNormalizer.Normalize(), a canonical alias table covering TMDB's French movie/TV genre translations, applied once at library ingestion (LibraryAnalysisService) so vocabulary building, embeddings, and diagnostic log labels all see the same canonical genre string\n- Unknown genres and tags are left untouched — tags are freeform/high-cardinality and not a good fit for a fixed alias table\n- Added GenreNormalizerTests covering known aliases, case-insensitivity, whitespace, and pass-through of unrecognized genres",
+        "changelog": "Improvement: normalize localized genre names so mixed-language libraries don't fragment recommendation matching\n- Root cause: TMDB metadata pulled in different provider locales gives some items \"Comedy\"/\"Adventure\"/\"Mystery\" and others \"Com\u00e9die\"/\"Aventure\"/\"Myst\u00e8re\" for the same genre; since the embedding vocabulary has one dimension per distinct genre string, these were treated as entirely unrelated genres, diluting the content-similarity signal for any user whose library mixes locales\n- Added GenreNormalizer.Normalize(), a canonical alias table covering TMDB's French movie/TV genre translations, applied once at library ingestion (LibraryAnalysisService) so vocabulary building, embeddings, and diagnostic log labels all see the same canonical genre string\n- Unknown genres and tags are left untouched \u2014 tags are freeform/high-cardinality and not a good fit for a fixed alias table\n- Added GenreNormalizerTests covering known aliases, case-insensitivity, whitespace, and pass-through of unrecognized genres",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.22/jellyfin-plugin-localrecs-v0.6.1.22.zip",
-        "checksum": "00000000000000000000000000000000",
+        "checksum": "c55deb11c17efe25e5613a5d1fa18348",
         "timestamp": "2026-08-16T00:00:00Z"
       },
       {
