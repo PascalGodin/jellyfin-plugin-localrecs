@@ -26,10 +26,17 @@
                         <h2 class="sectionTitle">Library Setup</h2>
                         <p>Complete these one-time setup steps to enable personalized recommendations for each user.</p>
 
-                        <p>Leaving Soon and Removal Candidates libraries are per-user, so each user only ever sees items from source libraries they already have access to.</p>
+                        <p>Leaving Soon is per-user, so each user only ever sees items from source libraries they already have access to.</p>
 
                         <div id="setupStatusContainer">
                             <p>Loading library paths...</p>
+                        </div>
+
+                        <h2 class="sectionTitle" style="margin-top: 2em;">Removal Candidates (global, admin-only)</h2>
+                        <p>A single unfiltered library, not per-user — it's a deletion worklist for admins, not user-facing content. Grant access to admin account(s) only.</p>
+
+                        <div id="globalPathsContainer">
+                            <p>Loading global library paths...</p>
                         </div>
                     </div>
                     
@@ -288,6 +295,7 @@
                             // Load setup status when switching to setup tab
                             if (item.tab === 'setup') {
                                 self.loadSetupStatus(page);
+                                self.loadGlobalPaths(page);
                             }
                             
                             // Load benchmark and diagnostic results when switching to actions tab
@@ -345,7 +353,38 @@
                             container.innerHTML = '<p style="color: #ff5252;">Error loading library paths. Please check that the plugin is properly installed.</p>';
                         });
                 },
-                
+
+                /**
+                 * Loads the global (non-per-user) Removal Candidates library paths.
+                 */
+                loadGlobalPaths: function(page) {
+                    var self = this;
+                    var container = page.querySelector('#globalPathsContainer');
+                    container.innerHTML = '<p>Loading global library paths...</p>';
+
+                    ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Setup/GlobalPaths'))
+                        .then(function(paths) {
+                            if (paths.LibrariesCreated) {
+                                container.innerHTML = '<div style="background: rgba(76, 175, 80, 0.1); padding: 1.5em; border-left: 4px solid #4caf50;">' +
+                                    '<h3 style="margin-top: 0;">Setup Complete!</h3>' +
+                                    '<p>Both Removal Candidates libraries have been created.</p>' +
+                                    '</div>';
+                                return;
+                            }
+
+                            var html = '<div class="paperList">';
+                            html += self.renderLibraryPathSection('Removal Candidates Movies', self.escapeHtml(paths.RemovalCandidatesMoviesPath), 'Removal Candidates Movies');
+                            html += self.renderLibraryPathSection('Removal Candidates TV', self.escapeHtml(paths.RemovalCandidatesTvPath), 'Removal Candidates TV');
+                            html += '</div>';
+                            container.innerHTML = html;
+                            self.initCopyButtons(page);
+                        })
+                        .catch(function(error) {
+                            console.error('Failed to load global library paths:', error);
+                            container.innerHTML = '<p style="color: #ff5252;">Error loading global library paths. Please check that the plugin is properly installed.</p>';
+                        });
+                },
+
                 /**
                  * Renders next steps box.
                  */
@@ -388,12 +427,6 @@
                     }
                     if (!user.LeavingSoonTvLibraryCreated) {
                         sections.push(['Leaving Soon TV Library', user.LeavingSoonTvLibraryPath, user.SuggestedLeavingSoonTvLibraryName]);
-                    }
-                    if (!user.RemovalCandidatesMovieLibraryCreated) {
-                        sections.push(['Removal Candidates Movies Library', user.RemovalCandidatesMovieLibraryPath, user.SuggestedRemovalCandidatesMovieLibraryName]);
-                    }
-                    if (!user.RemovalCandidatesTvLibraryCreated) {
-                        sections.push(['Removal Candidates TV Library', user.RemovalCandidatesTvLibraryPath, user.SuggestedRemovalCandidatesTvLibraryName]);
                     }
 
                     var html = '<div class="listItem" style="margin: 1em 0; padding: 1.5em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">';
@@ -756,6 +789,7 @@
                 if (LocalRecsConfig.initialized) {
                     if (page.querySelector('.tab-button-setup').classList.contains('ui-btn-active')) {
                         LocalRecsConfig.loadSetupStatus(page);
+                        LocalRecsConfig.loadGlobalPaths(page);
                     }
                     return;
                 }
@@ -767,6 +801,7 @@
 
                 // Load setup status (default tab)
                 LocalRecsConfig.loadSetupStatus(page);
+                LocalRecsConfig.loadGlobalPaths(page);
 
                 // Load configuration for settings tab
                 LocalRecsConfig.loadConfiguration(page);

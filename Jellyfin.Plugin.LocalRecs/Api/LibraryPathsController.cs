@@ -73,15 +73,11 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                     var tvPath = _virtualLibraryManager.GetUserLibraryPath(user.Id, MediaType.Series);
                     var leavingSoonMoviePath = _virtualLibraryManager.GetUserLeavingSoonPath(user.Id, MediaType.Movie);
                     var leavingSoonTvPath = _virtualLibraryManager.GetUserLeavingSoonPath(user.Id, MediaType.Series);
-                    var removalMoviePath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Movie);
-                    var removalTvPath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Series);
 
                     var movieCreated = LibraryExists(moviePath);
                     var tvCreated = LibraryExists(tvPath);
                     var leavingSoonMovieCreated = LibraryExists(leavingSoonMoviePath);
                     var leavingSoonTvCreated = LibraryExists(leavingSoonTvPath);
-                    var removalMovieCreated = LibraryExists(removalMoviePath);
-                    var removalTvCreated = LibraryExists(removalTvPath);
 
                     paths.Add(new UserLibraryPathInfo
                     {
@@ -95,18 +91,11 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         LeavingSoonTvLibraryPath = leavingSoonTvPath,
                         SuggestedLeavingSoonMovieLibraryName = $"{username}'s Leaving Soon Movies",
                         SuggestedLeavingSoonTvLibraryName = $"{username}'s Leaving Soon TV",
-                        RemovalCandidatesMovieLibraryPath = removalMoviePath,
-                        RemovalCandidatesTvLibraryPath = removalTvPath,
-                        SuggestedRemovalCandidatesMovieLibraryName = $"{username}'s Removal Candidates Movies",
-                        SuggestedRemovalCandidatesTvLibraryName = $"{username}'s Removal Candidates TV",
                         MovieLibraryCreated = movieCreated,
                         TvLibraryCreated = tvCreated,
                         LeavingSoonMovieLibraryCreated = leavingSoonMovieCreated,
                         LeavingSoonTvLibraryCreated = leavingSoonTvCreated,
-                        RemovalCandidatesMovieLibraryCreated = removalMovieCreated,
-                        RemovalCandidatesTvLibraryCreated = removalTvCreated,
-                        LibrariesCreated = movieCreated && tvCreated && leavingSoonMovieCreated
-                            && leavingSoonTvCreated && removalMovieCreated && removalTvCreated
+                        LibrariesCreated = movieCreated && tvCreated && leavingSoonMovieCreated && leavingSoonTvCreated
                     });
                 }
 
@@ -116,6 +105,36 @@ namespace Jellyfin.Plugin.LocalRecs.Api
             {
                 _logger.LogError(ex, "Failed to get library paths");
                 return StatusCode(500, "Failed to retrieve library paths");
+            }
+        }
+
+        /// <summary>
+        /// Gets the global (non-per-user) Removal Candidates library paths.
+        /// </summary>
+        /// <returns>Global library path information.</returns>
+        [HttpGet("Setup/GlobalPaths")]
+        public ActionResult<GlobalLibraryPathInfo> GetGlobalPaths()
+        {
+            try
+            {
+                var moviesPath = _virtualLibraryManager.RemovalCandidatesMoviesPath;
+                var tvPath = _virtualLibraryManager.RemovalCandidatesTvPath;
+                var virtualFolders = _libraryManager.GetVirtualFolders();
+
+                bool LibraryExists(string path) => virtualFolders.Any(vf => vf.Locations.Any(loc =>
+                    loc.Equals(path, StringComparison.OrdinalIgnoreCase)));
+
+                return Ok(new GlobalLibraryPathInfo
+                {
+                    RemovalCandidatesMoviesPath = moviesPath,
+                    RemovalCandidatesTvPath = tvPath,
+                    LibrariesCreated = LibraryExists(moviesPath) && LibraryExists(tvPath)
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get global library paths");
+                return StatusCode(500, "Failed to retrieve global library paths");
             }
         }
 

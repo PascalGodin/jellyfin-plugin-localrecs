@@ -3,7 +3,8 @@ using System;
 namespace Jellyfin.Plugin.LocalRecs.Api
 {
     /// <summary>
-    /// User library path information for setup UI.
+    /// User library path information for setup UI. Covers only the per-user libraries
+    /// (Recommended, Leaving Soon) — Removal Candidates is global, see <see cref="GlobalLibraryPathInfo"/>.
     /// </summary>
     public class UserLibraryPathInfo
     {
@@ -58,27 +59,7 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         public string SuggestedLeavingSoonTvLibraryName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Removal Candidates movies library path.
-        /// </summary>
-        public string RemovalCandidatesMovieLibraryPath { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the Removal Candidates TV library path.
-        /// </summary>
-        public string RemovalCandidatesTvLibraryPath { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the suggested Removal Candidates movies library name.
-        /// </summary>
-        public string SuggestedRemovalCandidatesMovieLibraryName { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the suggested Removal Candidates TV library name.
-        /// </summary>
-        public string SuggestedRemovalCandidatesTvLibraryName { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets a value indicating whether all six libraries are set up.
+        /// Gets or sets a value indicating whether all four per-user libraries are set up.
         /// </summary>
         public bool LibrariesCreated { get; set; }
 
@@ -101,15 +82,5 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         /// Gets or sets a value indicating whether the Leaving Soon TV library exists.
         /// </summary>
         public bool LeavingSoonTvLibraryCreated { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the Removal Candidates Movies library exists.
-        /// </summary>
-        public bool RemovalCandidatesMovieLibraryCreated { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the Removal Candidates TV library exists.
-        /// </summary>
-        public bool RemovalCandidatesTvLibraryCreated { get; set; }
     }
 }

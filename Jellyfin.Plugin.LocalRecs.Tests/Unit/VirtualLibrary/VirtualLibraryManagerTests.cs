@@ -145,23 +145,25 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit.VirtualLibrary
         }
 
         [Fact]
-        public void GetUserRemovalCandidatesPath_ReturnsCorrectMoviePath()
+        public void RemovalCandidatesPaths_AreGlobalNotPerUser()
         {
-            var userId = Guid.NewGuid();
-            var path = _manager.GetUserRemovalCandidatesPath(userId, MediaType.Movie);
-            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-movies"));
+            // Removal Candidates is a single admin-only worklist, not per-user — the paths
+            // must not depend on a user ID.
+            _manager.RemovalCandidatesMoviesPath.Should().Be(Path.Combine(_testBasePath, "removal-candidates", "movies"));
+            _manager.RemovalCandidatesTvPath.Should().Be(Path.Combine(_testBasePath, "removal-candidates", "tv"));
         }
 
         [Fact]
-        public void GetUserRemovalCandidatesPath_ReturnsCorrectTvPath()
+        public void EnsureGlobalDirectoriesExist_CreatesRemovalCandidateDirectories()
         {
-            var userId = Guid.NewGuid();
-            var path = _manager.GetUserRemovalCandidatesPath(userId, MediaType.Series);
-            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-tv"));
+            _manager.EnsureGlobalDirectoriesExist();
+
+            Directory.Exists(_manager.RemovalCandidatesMoviesPath).Should().BeTrue();
+            Directory.Exists(_manager.RemovalCandidatesTvPath).Should().BeTrue();
         }
 
         [Fact]
-        public void EnsureUserDirectoriesExist_CreatesLeavingSoonAndRemovalCandidateDirectories()
+        public void EnsureUserDirectoriesExist_CreatesLeavingSoonDirectories()
         {
             var userId = Guid.NewGuid();
             var result = _manager.EnsureUserDirectoriesExist(userId, "TestUser");
@@ -169,8 +171,16 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit.VirtualLibrary
             result.Should().BeTrue();
             Directory.Exists(_manager.GetUserLeavingSoonPath(userId, MediaType.Movie)).Should().BeTrue();
             Directory.Exists(_manager.GetUserLeavingSoonPath(userId, MediaType.Series)).Should().BeTrue();
-            Directory.Exists(_manager.GetUserRemovalCandidatesPath(userId, MediaType.Movie)).Should().BeTrue();
-            Directory.Exists(_manager.GetUserRemovalCandidatesPath(userId, MediaType.Series)).Should().BeTrue();
+        }
+
+        [Fact]
+        public void EnsureUserDirectoriesExist_DoesNotCreatePerUserRemovalCandidatesDirectory()
+        {
+            var userId = Guid.NewGuid();
+            _manager.EnsureUserDirectoriesExist(userId, "TestUser");
+
+            var perUserRemovalPath = Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-movies");
+            Directory.Exists(perUserRemovalPath).Should().BeFalse();
         }
 
         [Fact]

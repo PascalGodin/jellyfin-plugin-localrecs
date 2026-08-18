@@ -107,6 +107,8 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 return;
             }
 
+            _virtualLibraryManager.EnsureGlobalDirectoriesExist();
+
             // Get users once to avoid multiple enumerations
             var users = _userManager.GetUsers().ToList();
             var successCount = 0;
@@ -171,8 +173,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 var tvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "tv");
                 var leavingSoonMoviePath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "leaving-soon-movies");
                 var leavingSoonTvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "leaving-soon-tv");
-                var removalMoviePath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "removal-candidates-movies");
-                var removalTvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "removal-candidates-tv");
                 var username = user.Username ?? "Unknown";
 
                 sb.AppendLine($"User: {username} (ID: {user.Id})");
@@ -197,16 +197,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 sb.AppendLine("      Library Type: Shows");
                 sb.AppendLine($"      Suggested Name: \"{username}'s Leaving Soon TV\"");
                 sb.AppendLine();
-                sb.AppendLine("  [5] Removal Candidates Movies:");
-                sb.AppendLine($"      Path: {removalMoviePath}");
-                sb.AppendLine("      Library Type: Movies");
-                sb.AppendLine($"      Suggested Name: \"{username}'s Removal Candidates Movies\"");
-                sb.AppendLine();
-                sb.AppendLine("  [6] Removal Candidates TV:");
-                sb.AppendLine($"      Path: {removalTvPath}");
-                sb.AppendLine("      Library Type: Shows");
-                sb.AppendLine($"      Suggested Name: \"{username}'s Removal Candidates TV\"");
-                sb.AppendLine();
                 sb.AppendLine("  Setup Instructions:");
                 sb.AppendLine("    1. Go to Jellyfin Dashboard → Libraries → Add Media Library");
                 sb.AppendLine("    2. For EACH content type above, create a SEPARATE library:");
@@ -215,12 +205,28 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 sb.AppendLine("       - Use the suggested library name");
                 sb.AppendLine("    3. Set library permissions:");
                 sb.AppendLine($"       - Dashboard → Users → {username} → Library Access");
-                sb.AppendLine($"       - Enable ONLY {username}'s libraries (all six above)");
+                sb.AppendLine($"       - Enable ONLY {username}'s libraries (all four above)");
                 sb.AppendLine("       - Disable other users' libraries");
-                sb.AppendLine("       - Leaving Soon / Removal Candidates are per-user so a user only ever");
-                sb.AppendLine("         sees items from source libraries they already have access to.");
+                sb.AppendLine("       - Leaving Soon is per-user so a user only ever sees items from");
+                sb.AppendLine("         source libraries they already have access to.");
                 sb.AppendLine("--------------------------------------------------------------------------------");
             }
+
+            sb.AppendLine("Removal Candidates (global, admin-only — NOT per-user):");
+            sb.AppendLine("--------------------------------------------------------------------------------");
+            sb.AppendLine("  [1] Removal Candidates Movies:");
+            sb.AppendLine($"      Path: {_virtualLibraryManager.RemovalCandidatesMoviesPath}");
+            sb.AppendLine("      Library Type: Movies");
+            sb.AppendLine("      Suggested Name: \"Removal Candidates Movies\"");
+            sb.AppendLine();
+            sb.AppendLine("  [2] Removal Candidates TV:");
+            sb.AppendLine($"      Path: {_virtualLibraryManager.RemovalCandidatesTvPath}");
+            sb.AppendLine("      Library Type: Shows");
+            sb.AppendLine("      Suggested Name: \"Removal Candidates TV\"");
+            sb.AppendLine();
+            sb.AppendLine("  Add each path ONCE (not per user). Grant access to admin account(s) only —");
+            sb.AppendLine("  this is an unfiltered deletion worklist, not user-facing content.");
+            sb.AppendLine("--------------------------------------------------------------------------------");
 
             sb.AppendLine("================================================================================");
             sb.AppendLine("Next Step: Dashboard → Scheduled Tasks → 'Refresh Local Recommendations' → Run");

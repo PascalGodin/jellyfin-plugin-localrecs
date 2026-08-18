@@ -250,13 +250,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             {
                 // Leaving Soon libraries are per-user, so scan every user's own folders — a favorite
                 // flagged in any one user's virtual library still protects the item household-wide.
+                // Removal Candidates is a single global library, so its two paths are added once.
                 var leavingSoonPaths = userIds.SelectMany(userId => new[]
                 {
                     _virtualLibraryManager.GetUserLeavingSoonPath(userId, MediaType.Movie),
                     _virtualLibraryManager.GetUserLeavingSoonPath(userId, MediaType.Series),
-                    _virtualLibraryManager.GetUserRemovalCandidatesPath(userId, MediaType.Movie),
-                    _virtualLibraryManager.GetUserRemovalCandidatesPath(userId, MediaType.Series),
-                });
+                })
+                .Append(_virtualLibraryManager.RemovalCandidatesMoviesPath)
+                .Append(_virtualLibraryManager.RemovalCandidatesTvPath);
 
                 var virtualProtected = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
                     userIds,

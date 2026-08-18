@@ -73,16 +73,26 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             return Path.Combine(_virtualLibraryBasePath, userId.ToString(), subfolder);
         }
 
+        /// <summary>Gets the path for the Removal Candidates Movies library.</summary>
+        /// <remarks>
+        /// Unlike Leaving Soon, Removal Candidates is a single global library, not per-user.
+        /// It's meant as an admin-only worklist for actually deleting stale content from the
+        /// server, not user-facing content — so it doesn't need per-user access filtering, and
+        /// duplicating it into every user's folder tree would just be wasted symlinks. Grant
+        /// access to admin accounts only.
+        /// </remarks>
+        public string RemovalCandidatesMoviesPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "movies");
+
+        /// <summary>Gets the path for the Removal Candidates TV library. See <see cref="RemovalCandidatesMoviesPath"/>.</summary>
+        public string RemovalCandidatesTvPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "tv");
+
         /// <summary>
-        /// Gets the per-user virtual library path for Removal Candidates items of a given media type.
+        /// Ensures the global (non-per-user) Removal Candidates directories exist.
         /// </summary>
-        /// <param name="userId">User ID.</param>
-        /// <param name="mediaType">Media type (Movie or Series).</param>
-        /// <returns>Full path to the user's Removal Candidates virtual library directory.</returns>
-        public string GetUserRemovalCandidatesPath(Guid userId, MediaType mediaType)
+        public void EnsureGlobalDirectoriesExist()
         {
-            var subfolder = mediaType == MediaType.Movie ? "removal-candidates-movies" : "removal-candidates-tv";
-            return Path.Combine(_virtualLibraryBasePath, userId.ToString(), subfolder);
+            Directory.CreateDirectory(RemovalCandidatesMoviesPath);
+            Directory.CreateDirectory(RemovalCandidatesTvPath);
         }
 
         /// <summary>
@@ -101,8 +111,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 Directory.CreateDirectory(GetUserLibraryPath(userId, MediaType.Series));
                 Directory.CreateDirectory(GetUserLeavingSoonPath(userId, MediaType.Movie));
                 Directory.CreateDirectory(GetUserLeavingSoonPath(userId, MediaType.Series));
-                Directory.CreateDirectory(GetUserRemovalCandidatesPath(userId, MediaType.Movie));
-                Directory.CreateDirectory(GetUserRemovalCandidatesPath(userId, MediaType.Series));
 
                 _logger.LogDebug(
                     "Ensured virtual library directories exist for user {Username} ({UserId})",
@@ -186,12 +194,13 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
         }
 
         /// <summary>
-        /// Clears and recreates each user's Leaving Soon / Removal Candidates libraries.
-        /// Household-wide flagging (which items are Leaving Soon at all) is unchanged; this only
-        /// controls which of those items each user's own library folders link to. An item is
-        /// only linked into a user's folder if BaseItem.IsVisible(User) says that
-        /// user can already see it via their normal library access — so a user restricted to a
-        /// kids library never gets a Leaving Soon symlink into content outside that library.
+        /// Clears and recreates Leaving Soon (per-user) and Removal Candidates (global) libraries.
+        /// Household-wide flagging (which items are Leaving Soon / Removal Candidates at all) is
+        /// unchanged. Leaving Soon links into each user's own folder only items BaseItem.IsVisible(User)
+        /// says that user can already see via their normal library access — so a user restricted to a
+        /// kids library never gets a Leaving Soon symlink into content outside that library. Removal
+        /// Candidates stays a single unfiltered library, since it's an admin-only deletion worklist,
+        /// not user-facing content — don't grant regular users access to it.
         /// </summary>
         /// <param name="state">The current Leaving Soon state.</param>
         /// <param name="allItems">All media items, used to resolve media type per state entry.</param>
@@ -228,12 +237,13 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             {
                 SyncUserLibrary(GetUserLeavingSoonPath(user.Id, MediaType.Movie), flaggedMovieIds, user);
                 SyncUserLibrary(GetUserLeavingSoonPath(user.Id, MediaType.Series), flaggedTvIds, user);
-                SyncUserLibrary(GetUserRemovalCandidatesPath(user.Id, MediaType.Movie), removalMovieIds, user);
-                SyncUserLibrary(GetUserRemovalCandidatesPath(user.Id, MediaType.Series), removalTvIds, user);
             }
 
+            SyncGlobalLibrary(RemovalCandidatesMoviesPath, removalMovieIds);
+            SyncGlobalLibrary(RemovalCandidatesTvPath, removalTvIds);
+
             _logger.LogDebug(
-                "Synced per-user Leaving Soon libraries: {FlaggedCount} flagged, {RemovalCount} removal candidates",
+                "Synced Leaving Soon libraries: {FlaggedCount} flagged, {RemovalCount} removal candidates",
                 state.FlaggedItems.Count,
                 state.RemovalCandidates.Count);
         }
@@ -344,16 +354,15 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
 
                 var flaggedMovieIds = FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Movie).ToList();
                 var flaggedTvIds = FilterIds(leavingSoonState.FlaggedItems, metaById, MediaType.Series).ToList();
-                var removalMovieIds = FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToList();
-                var removalTvIds = FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToList();
 
                 foreach (var user in usersList)
                 {
                     CheckLibrary(GetUserLeavingSoonPath(user.Id, MediaType.Movie), $"{user.Username} — Leaving Soon Movies", VisibleTo(flaggedMovieIds, user));
                     CheckLibrary(GetUserLeavingSoonPath(user.Id, MediaType.Series), $"{user.Username} — Leaving Soon TV", VisibleTo(flaggedTvIds, user));
-                    CheckLibrary(GetUserRemovalCandidatesPath(user.Id, MediaType.Movie), $"{user.Username} — Removal Candidates Movies", VisibleTo(removalMovieIds, user));
-                    CheckLibrary(GetUserRemovalCandidatesPath(user.Id, MediaType.Series), $"{user.Username} — Removal Candidates TV", VisibleTo(removalTvIds, user));
                 }
+
+                CheckLibrary(RemovalCandidatesMoviesPath, "Removal Candidates — Movies", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Movie).ToHashSet());
+                CheckLibrary(RemovalCandidatesTvPath, "Removal Candidates — TV", FilterIds(leavingSoonState.RemovalCandidates, metaById, MediaType.Series).ToHashSet());
             }
             else
             {
@@ -461,7 +470,19 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             return result;
         }
 
-        private void SyncUserLibrary(string libraryPath, IEnumerable<Guid> itemIds, User user)
+        /// <summary>
+        /// Syncs a global, unfiltered library (currently just Removal Candidates) — every item is
+        /// linked regardless of any user's access grants.
+        /// </summary>
+        private void SyncGlobalLibrary(string libraryPath, IEnumerable<Guid> itemIds) => SyncLibrary(libraryPath, itemIds, user: null);
+
+        /// <summary>
+        /// Syncs a per-user library (currently just Leaving Soon) — an item is only linked in if
+        /// the user can already see it via their normal library access grants.
+        /// </summary>
+        private void SyncUserLibrary(string libraryPath, IEnumerable<Guid> itemIds, User user) => SyncLibrary(libraryPath, itemIds, user);
+
+        private void SyncLibrary(string libraryPath, IEnumerable<Guid> itemIds, User? user)
         {
             if (Directory.Exists(libraryPath))
             {
@@ -480,7 +501,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                         continue;
                     }
 
-                    if (!item.IsVisible(user))
+                    if (user != null && !item.IsVisible(user))
                     {
                         // User doesn't have access to the source library this item lives in —
                         // never link it into their Leaving Soon folder.
