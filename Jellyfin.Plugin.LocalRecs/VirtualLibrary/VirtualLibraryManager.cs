@@ -47,6 +47,19 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             _virtualLibraryBasePath = virtualLibraryBasePath ?? throw new ArgumentNullException(nameof(virtualLibraryBasePath));
         }
 
+        /// <summary>Gets the path for the Removal Candidates Movies library.</summary>
+        /// <remarks>
+        /// Unlike Leaving Soon, Removal Candidates is a single global library, not per-user.
+        /// It's meant as an admin-only worklist for actually deleting stale content from the
+        /// server, not user-facing content — so it doesn't need per-user access filtering, and
+        /// duplicating it into every user's folder tree would just be wasted symlinks. Grant
+        /// access to admin accounts only.
+        /// </remarks>
+        public string RemovalCandidatesMoviesPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "movies");
+
+        /// <summary>Gets the path for the Removal Candidates TV library. See <see cref="RemovalCandidatesMoviesPath"/>.</summary>
+        public string RemovalCandidatesTvPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "tv");
+
         /// <summary>
         /// Gets the virtual library path for a specific user and media type.
         /// </summary>
@@ -72,19 +85,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             var subfolder = mediaType == MediaType.Movie ? "leaving-soon-movies" : "leaving-soon-tv";
             return Path.Combine(_virtualLibraryBasePath, userId.ToString(), subfolder);
         }
-
-        /// <summary>Gets the path for the Removal Candidates Movies library.</summary>
-        /// <remarks>
-        /// Unlike Leaving Soon, Removal Candidates is a single global library, not per-user.
-        /// It's meant as an admin-only worklist for actually deleting stale content from the
-        /// server, not user-facing content — so it doesn't need per-user access filtering, and
-        /// duplicating it into every user's folder tree would just be wasted symlinks. Grant
-        /// access to admin accounts only.
-        /// </remarks>
-        public string RemovalCandidatesMoviesPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "movies");
-
-        /// <summary>Gets the path for the Removal Candidates TV library. See <see cref="RemovalCandidatesMoviesPath"/>.</summary>
-        public string RemovalCandidatesTvPath => Path.Combine(_virtualLibraryBasePath, "removal-candidates", "tv");
 
         /// <summary>
         /// Ensures the global (non-per-user) Removal Candidates directories exist.
