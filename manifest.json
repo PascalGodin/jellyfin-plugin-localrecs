@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.28",
+        "changelog": "Fix: Setup tab re-prompted for already-created Recommended Movies/TV libraries after v0.6.1.27\n- The per-user setup completeness check now requires all six libraries (Recommended, Leaving Soon, Removal Candidates x Movies/TV), so an existing user with only the original two set up saw their whole card re-render, including sections for libraries they'd already created\n- Fix: each of the six per-user library sections now tracks its own created/missing state independently, so the Setup tab only lists the libraries actually missing (in practice: just the four new Leaving Soon / Removal Candidates ones for existing installs)\n- Also removes an unrelated stray unclosed <div> left over from the v0.6.1.27 setup-card refactor\n- Note: the config page can serve a stale cached copy after upgrading — hard refresh (Ctrl+Shift+R) the plugin config tab if the Setup tab still shows the old shared-library UI or errors calling the removed Setup/SharedPaths endpoint",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.28/jellyfin-plugin-localrecs-v0.6.1.28.zip",
+        "checksum": "",
+        "timestamp": "2026-08-17T00:00:00Z"
+      },
+      {
         "version": "0.6.1.27",
         "changelog": "Fix: Leaving Soon / Removal Candidates libraries did not respect per-user library access\n- Leaving Soon was one library folder shared by every user with access to it, symlinking every flagged item across the whole household regardless of which source library it came from \u2014 a user restricted to a kids-only library who was also granted access to Leaving Soon could see and play flagged items from libraries they otherwise have no access to\n- Fix: Leaving Soon and Removal Candidates are now per-user, mirroring how personalized recommendation libraries already work. Household-wide flagging (which items are Leaving Soon at all) is unchanged; each user's own folder only links items MediaBrowser.Controller.Entities.BaseItem.IsVisible(User) says they can already see via their normal library grants \u2014 the same check Jellyfin itself uses to gate access and parental controls\n- Setup now creates six per-user library folders instead of two per-user + four shared (Recommended Movies/TV, Leaving Soon Movies/TV, Removal Candidates Movies/TV); the config page's Setup tab and setup-instructions log reflect the new per-user paths\n- Migration: existing shared \"Leaving Soon\" / \"Removal Candidates\" libraries in Jellyfin should be deleted and replaced with the new per-user ones shown on the config page after upgrading and running a refresh\n- Added tests for the new per-user path construction and directory pre-creation",
         "targetAbi": "10.11.9.0",

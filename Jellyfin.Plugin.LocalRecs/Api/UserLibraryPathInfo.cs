@@ -78,8 +78,38 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         public string SuggestedRemovalCandidatesTvLibraryName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets a value indicating whether the libraries are set up.
+        /// Gets or sets a value indicating whether all six libraries are set up.
         /// </summary>
         public bool LibrariesCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Recommended Movies library exists.
+        /// </summary>
+        public bool MovieLibraryCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Recommended TV library exists.
+        /// </summary>
+        public bool TvLibraryCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Leaving Soon Movies library exists.
+        /// </summary>
+        public bool LeavingSoonMovieLibraryCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Leaving Soon TV library exists.
+        /// </summary>
+        public bool LeavingSoonTvLibraryCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Removal Candidates Movies library exists.
+        /// </summary>
+        public bool RemovalCandidatesMovieLibraryCreated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the Removal Candidates TV library exists.
+        /// </summary>
+        public bool RemovalCandidatesTvLibraryCreated { get; set; }
     }
 }

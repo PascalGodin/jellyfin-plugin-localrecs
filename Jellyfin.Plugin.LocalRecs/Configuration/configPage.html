@@ -366,48 +366,54 @@
                  * Renders a user setup card.
                  */
                 renderUserSetupCard: function(user) {
-                    // Skip rendering if libraries are already created
+                    // Skip rendering entirely if every library already exists
                     if (user.LibrariesCreated) {
                         return '';
                     }
 
                     var username = this.escapeHtml(user.Username);
-                    var moviePath = this.escapeHtml(user.MovieLibraryPath);
-                    var tvPath = this.escapeHtml(user.TvLibraryPath);
-                    var suggestedMovieName = this.escapeHtml(user.SuggestedMovieLibraryName);
-                    var suggestedTvName = this.escapeHtml(user.SuggestedTvLibraryName);
-                    var leavingSoonMoviePath = this.escapeHtml(user.LeavingSoonMovieLibraryPath);
-                    var leavingSoonTvPath = this.escapeHtml(user.LeavingSoonTvLibraryPath);
-                    var suggestedLeavingSoonMovieName = this.escapeHtml(user.SuggestedLeavingSoonMovieLibraryName);
-                    var suggestedLeavingSoonTvName = this.escapeHtml(user.SuggestedLeavingSoonTvLibraryName);
-                    var removalMoviePath = this.escapeHtml(user.RemovalCandidatesMovieLibraryPath);
-                    var removalTvPath = this.escapeHtml(user.RemovalCandidatesTvLibraryPath);
-                    var suggestedRemovalMovieName = this.escapeHtml(user.SuggestedRemovalCandidatesMovieLibraryName);
-                    var suggestedRemovalTvName = this.escapeHtml(user.SuggestedRemovalCandidatesTvLibraryName);
                     var userIdForButton = user.UserId.replace(/-/g, '');
-                    
+
+                    // Only render sections for libraries that don't already exist, so a user who
+                    // already set up Recommended Movies/TV isn't told to redo them.
+                    var sections = [];
+                    if (!user.MovieLibraryCreated) {
+                        sections.push(['Recommended Movies Library', user.MovieLibraryPath, user.SuggestedMovieLibraryName]);
+                    }
+                    if (!user.TvLibraryCreated) {
+                        sections.push(['Recommended TV Library', user.TvLibraryPath, user.SuggestedTvLibraryName]);
+                    }
+                    if (!user.LeavingSoonMovieLibraryCreated) {
+                        sections.push(['Leaving Soon Movies Library', user.LeavingSoonMovieLibraryPath, user.SuggestedLeavingSoonMovieLibraryName]);
+                    }
+                    if (!user.LeavingSoonTvLibraryCreated) {
+                        sections.push(['Leaving Soon TV Library', user.LeavingSoonTvLibraryPath, user.SuggestedLeavingSoonTvLibraryName]);
+                    }
+                    if (!user.RemovalCandidatesMovieLibraryCreated) {
+                        sections.push(['Removal Candidates Movies Library', user.RemovalCandidatesMovieLibraryPath, user.SuggestedRemovalCandidatesMovieLibraryName]);
+                    }
+                    if (!user.RemovalCandidatesTvLibraryCreated) {
+                        sections.push(['Removal Candidates TV Library', user.RemovalCandidatesTvLibraryPath, user.SuggestedRemovalCandidatesTvLibraryName]);
+                    }
+
                     var html = '<div class="listItem" style="margin: 1em 0; padding: 1.5em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">';
-                    
+
                     html += '<h3 style="margin-top: 0;">' + username + '</h3>';
-                    
-                    // Movie library section
-                    html += '<div style="margin: 1.5em 0;">';
-                    html += this.renderLibraryPathSection('Recommended Movies Library', moviePath, suggestedMovieName);
-                    html += this.renderLibraryPathSection('Recommended TV Library', tvPath, suggestedTvName);
-                    html += this.renderLibraryPathSection('Leaving Soon Movies Library', leavingSoonMoviePath, suggestedLeavingSoonMovieName);
-                    html += this.renderLibraryPathSection('Leaving Soon TV Library', leavingSoonTvPath, suggestedLeavingSoonTvName);
-                    html += this.renderLibraryPathSection('Removal Candidates Movies Library', removalMoviePath, suggestedRemovalMovieName);
-                    html += this.renderLibraryPathSection('Removal Candidates TV Library', removalTvPath, suggestedRemovalTvName);
+
+                    var self = this;
+                    sections.forEach(function(s) {
+                        html += self.renderLibraryPathSection(s[0], self.escapeHtml(s[1]), self.escapeHtml(s[2]));
+                    });
 
                     // Instructions - now in a more readable format
                     html += '<div style="margin-top: 2em; padding: 1em; background: rgba(33,150,243,0.1); border-left: 4px solid #2196f3;">';
                     html += '<h4 style="margin-top: 0;">Setup Instructions</h4>';
                     html += '<ol style="margin: 0.5em 0; padding-left: 1.5em; line-height: 1.8;">';
                     html += '<li>Go to <strong>Dashboard → Libraries → Add Media Library</strong></li>';
-                    html += '<li>For each of the six libraries above, create a separate library:';
+                    html += '<li>For each library above, create a separate library:';
                     html += '<ul style="margin-top: 0.3em;"><li>Select <strong>Movies</strong> or <strong>Shows</strong> as content type, matching the library</li>';
                     html += '<li>Add the folder path shown above and use the suggested name</li></ul></li>';
-                    html += '<li>Set library permissions: <strong>Dashboard → Users → ' + username + ' → Library Access</strong> — enable only ' + username + '&rsquo;s six libraries</li>';
+                    html += '<li>Set library permissions: <strong>Dashboard → Users → ' + username + ' → Library Access</strong> — enable only ' + username + '&rsquo;s libraries</li>';
                     html += '</ol>';
                     html += '</div>';
 

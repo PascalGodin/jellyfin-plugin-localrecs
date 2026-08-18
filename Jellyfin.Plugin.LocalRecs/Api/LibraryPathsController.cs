@@ -76,12 +76,12 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                     var removalMoviePath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Movie);
                     var removalTvPath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Series);
 
-                    bool librariesCreated = LibraryExists(moviePath)
-                        && LibraryExists(tvPath)
-                        && LibraryExists(leavingSoonMoviePath)
-                        && LibraryExists(leavingSoonTvPath)
-                        && LibraryExists(removalMoviePath)
-                        && LibraryExists(removalTvPath);
+                    var movieCreated = LibraryExists(moviePath);
+                    var tvCreated = LibraryExists(tvPath);
+                    var leavingSoonMovieCreated = LibraryExists(leavingSoonMoviePath);
+                    var leavingSoonTvCreated = LibraryExists(leavingSoonTvPath);
+                    var removalMovieCreated = LibraryExists(removalMoviePath);
+                    var removalTvCreated = LibraryExists(removalTvPath);
 
                     paths.Add(new UserLibraryPathInfo
                     {
@@ -99,7 +99,14 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         RemovalCandidatesTvLibraryPath = removalTvPath,
                         SuggestedRemovalCandidatesMovieLibraryName = $"{username}'s Removal Candidates Movies",
                         SuggestedRemovalCandidatesTvLibraryName = $"{username}'s Removal Candidates TV",
-                        LibrariesCreated = librariesCreated
+                        MovieLibraryCreated = movieCreated,
+                        TvLibraryCreated = tvCreated,
+                        LeavingSoonMovieLibraryCreated = leavingSoonMovieCreated,
+                        LeavingSoonTvLibraryCreated = leavingSoonTvCreated,
+                        RemovalCandidatesMovieLibraryCreated = removalMovieCreated,
+                        RemovalCandidatesTvLibraryCreated = removalTvCreated,
+                        LibrariesCreated = movieCreated && tvCreated && leavingSoonMovieCreated
+                            && leavingSoonTvCreated && removalMovieCreated && removalTvCreated
                     });
                 }
 
