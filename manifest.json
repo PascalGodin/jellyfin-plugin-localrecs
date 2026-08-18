@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.1.28",
-        "changelog": "Fix: Setup tab re-prompted for already-created Recommended Movies/TV libraries after v0.6.1.27\n- The per-user setup completeness check now requires all six libraries (Recommended, Leaving Soon, Removal Candidates x Movies/TV), so an existing user with only the original two set up saw their whole card re-render, including sections for libraries they'd already created\n- Fix: each of the six per-user library sections now tracks its own created/missing state independently, so the Setup tab only lists the libraries actually missing (in practice: just the four new Leaving Soon / Removal Candidates ones for existing installs)\n- Also removes an unrelated stray unclosed <div> left over from the v0.6.1.27 setup-card refactor\n- Note: the config page can serve a stale cached copy after upgrading — hard refresh (Ctrl+Shift+R) the plugin config tab if the Setup tab still shows the old shared-library UI or errors calling the removed Setup/SharedPaths endpoint",
+        "changelog": "Fix: Setup tab re-prompted for already-created Recommended Movies/TV libraries after v0.6.1.27\n- The per-user setup completeness check now requires all six libraries (Recommended, Leaving Soon, Removal Candidates x Movies/TV), so an existing user with only the original two set up saw their whole card re-render, including sections for libraries they'd already created\n- Fix: each of the six per-user library sections now tracks its own created/missing state independently, so the Setup tab only lists the libraries actually missing (in practice: just the four new Leaving Soon / Removal Candidates ones for existing installs)\n- Also removes an unrelated stray unclosed <div> left over from the v0.6.1.27 setup-card refactor\n- Note: the config page can serve a stale cached copy after upgrading \u2014 hard refresh (Ctrl+Shift+R) the plugin config tab if the Setup tab still shows the old shared-library UI or errors calling the removed Setup/SharedPaths endpoint",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.28/jellyfin-plugin-localrecs-v0.6.1.28.zip",
-        "checksum": "",
+        "checksum": "2322827297d4fc681091431c95b6964c",
         "timestamp": "2026-08-17T00:00:00Z"
       },
       {
