@@ -26,15 +26,10 @@
                         <h2 class="sectionTitle">Library Setup</h2>
                         <p>Complete these one-time setup steps to enable personalized recommendations for each user.</p>
 
+                        <p>Leaving Soon and Removal Candidates libraries are per-user, so each user only ever sees items from source libraries they already have access to.</p>
+
                         <div id="setupStatusContainer">
                             <p>Loading library paths...</p>
-                        </div>
-
-                        <h2 class="sectionTitle" style="margin-top: 2em;">Leaving Soon Libraries</h2>
-                        <p>Shared libraries showing which items may be removed. Add each path once — visible to all users with library access.</p>
-
-                        <div id="sharedPathsContainer">
-                            <p>Loading shared library paths...</p>
                         </div>
                     </div>
                     
@@ -293,7 +288,6 @@
                             // Load setup status when switching to setup tab
                             if (item.tab === 'setup') {
                                 self.loadSetupStatus(page);
-                                self.loadSharedPaths(page);
                             }
                             
                             // Load benchmark and diagnostic results when switching to actions tab
@@ -382,6 +376,14 @@
                     var tvPath = this.escapeHtml(user.TvLibraryPath);
                     var suggestedMovieName = this.escapeHtml(user.SuggestedMovieLibraryName);
                     var suggestedTvName = this.escapeHtml(user.SuggestedTvLibraryName);
+                    var leavingSoonMoviePath = this.escapeHtml(user.LeavingSoonMovieLibraryPath);
+                    var leavingSoonTvPath = this.escapeHtml(user.LeavingSoonTvLibraryPath);
+                    var suggestedLeavingSoonMovieName = this.escapeHtml(user.SuggestedLeavingSoonMovieLibraryName);
+                    var suggestedLeavingSoonTvName = this.escapeHtml(user.SuggestedLeavingSoonTvLibraryName);
+                    var removalMoviePath = this.escapeHtml(user.RemovalCandidatesMovieLibraryPath);
+                    var removalTvPath = this.escapeHtml(user.RemovalCandidatesTvLibraryPath);
+                    var suggestedRemovalMovieName = this.escapeHtml(user.SuggestedRemovalCandidatesMovieLibraryName);
+                    var suggestedRemovalTvName = this.escapeHtml(user.SuggestedRemovalCandidatesTvLibraryName);
                     var userIdForButton = user.UserId.replace(/-/g, '');
                     
                     var html = '<div class="listItem" style="margin: 1em 0; padding: 1.5em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">';
@@ -390,49 +392,48 @@
                     
                     // Movie library section
                     html += '<div style="margin: 1.5em 0;">';
-                    html += '<h4 style="margin-bottom: 0.5em;">Recommended Movies Library</h4>';
-                    html += '<div class="inputContainer">';
-                    html += '<label class="inputLabel inputLabelUnfocused">Folder Path:</label>';
-                    html += '<div style="display: flex; gap: 0.5em; align-items: center;">';
-                    html += '<input type="text" class="emby-input" readonly value="' + moviePath + '" style="flex: 1; font-family: monospace;" />';
-                    html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + moviePath + '" style="min-width: 80px;">Copy</button>';
-                    html += '</div>';
-                    html += '<div class="fieldDescription" style="margin-top: 0.5em;">Suggested Library Name: <strong>' + suggestedMovieName + '</strong></div>';
-                    html += '</div>';
-                    html += '</div>';
-                    
-                    // TV library section
-                    html += '<div style="margin: 1.5em 0;">';
-                    html += '<h4 style="margin-bottom: 0.5em;">Recommended TV Library</h4>';
-                    html += '<div class="inputContainer">';
-                    html += '<label class="inputLabel inputLabelUnfocused">Folder Path:</label>';
-                    html += '<div style="display: flex; gap: 0.5em; align-items: center;">';
-                    html += '<input type="text" class="emby-input" readonly value="' + tvPath + '" style="flex: 1; font-family: monospace;" />';
-                    html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + tvPath + '" style="min-width: 80px;">Copy</button>';
-                    html += '</div>';
-                    html += '<div class="fieldDescription" style="margin-top: 0.5em;">Suggested Library Name: <strong>' + suggestedTvName + '</strong></div>';
-                    html += '</div>';
-                    html += '</div>';
-                    
+                    html += this.renderLibraryPathSection('Recommended Movies Library', moviePath, suggestedMovieName);
+                    html += this.renderLibraryPathSection('Recommended TV Library', tvPath, suggestedTvName);
+                    html += this.renderLibraryPathSection('Leaving Soon Movies Library', leavingSoonMoviePath, suggestedLeavingSoonMovieName);
+                    html += this.renderLibraryPathSection('Leaving Soon TV Library', leavingSoonTvPath, suggestedLeavingSoonTvName);
+                    html += this.renderLibraryPathSection('Removal Candidates Movies Library', removalMoviePath, suggestedRemovalMovieName);
+                    html += this.renderLibraryPathSection('Removal Candidates TV Library', removalTvPath, suggestedRemovalTvName);
+
                     // Instructions - now in a more readable format
                     html += '<div style="margin-top: 2em; padding: 1em; background: rgba(33,150,243,0.1); border-left: 4px solid #2196f3;">';
                     html += '<h4 style="margin-top: 0;">Setup Instructions</h4>';
                     html += '<ol style="margin: 0.5em 0; padding-left: 1.5em; line-height: 1.8;">';
                     html += '<li>Go to <strong>Dashboard → Libraries → Add Media Library</strong></li>';
-                    html += '<li>Create the Movies library:';
-                    html += '<ul style="margin-top: 0.3em;"><li>Select <strong>Movies</strong> as content type</li>';
-                    html += '<li>Add the Movies folder path shown above</li></ul></li>';
-                    html += '<li>Create the TV library:';
-                    html += '<ul style="margin-top: 0.3em;"><li>Select <strong>Shows</strong> as content type</li>';
-                    html += '<li>Add the TV folder path shown above</li></ul></li>';
-                    html += '<li>Set library permissions: <strong>Dashboard → Users → ' + username + ' → Library Access</strong></li>';
+                    html += '<li>For each of the six libraries above, create a separate library:';
+                    html += '<ul style="margin-top: 0.3em;"><li>Select <strong>Movies</strong> or <strong>Shows</strong> as content type, matching the library</li>';
+                    html += '<li>Add the folder path shown above and use the suggested name</li></ul></li>';
+                    html += '<li>Set library permissions: <strong>Dashboard → Users → ' + username + ' → Library Access</strong> — enable only ' + username + '&rsquo;s six libraries</li>';
                     html += '</ol>';
                     html += '</div>';
-                    
+
                     html += '</div>';
                     return html;
                 },
-                
+
+                /**
+                 * Renders a single "Folder Path + suggested name" section used for each
+                 * per-user library (Recommended, Leaving Soon, Removal Candidates).
+                 */
+                renderLibraryPathSection: function(title, path, suggestedName) {
+                    var html = '<div style="margin: 1.5em 0;">';
+                    html += '<h4 style="margin-bottom: 0.5em;">' + title + '</h4>';
+                    html += '<div class="inputContainer">';
+                    html += '<label class="inputLabel inputLabelUnfocused">Folder Path:</label>';
+                    html += '<div style="display: flex; gap: 0.5em; align-items: center;">';
+                    html += '<input type="text" class="emby-input" readonly value="' + path + '" style="flex: 1; font-family: monospace;" />';
+                    html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + path + '" style="min-width: 80px;">Copy</button>';
+                    html += '</div>';
+                    html += '<div class="fieldDescription" style="margin-top: 0.5em;">Suggested Library Name: <strong>' + suggestedName + '</strong></div>';
+                    html += '</div>';
+                    html += '</div>';
+                    return html;
+                },
+
                 /**
                  * Initializes copy button event handlers.
                  */
@@ -604,47 +605,6 @@
                 },
                 
                 /**
-                 * Loads shared Leaving Soon library paths from the API.
-                 */
-                loadSharedPaths: function(page) {
-                    var self = this;
-                    var container = page.querySelector('#sharedPathsContainer');
-                    container.innerHTML = '<p>Loading shared library paths...</p>';
-
-                    ApiClient.getJSON(ApiClient.getUrl('LocalRecs/Setup/SharedPaths'))
-                        .then(function(paths) {
-                            var html = '<div class="paperList">';
-                            html += self.renderSharedPathCard('Leaving Soon — Movies', paths.LeavingSoonMoviesPath, 'Movies');
-                            html += self.renderSharedPathCard('Leaving Soon — TV', paths.LeavingSoonTvPath, 'Shows');
-                            html += self.renderSharedPathCard('Removal Candidates — Movies', paths.RemovalCandidatesMoviesPath, 'Movies');
-                            html += self.renderSharedPathCard('Removal Candidates — TV', paths.RemovalCandidatesTvPath, 'Shows');
-                            html += '</div>';
-                            container.innerHTML = html;
-                            self.initCopyButtons(page);
-                        })
-                        .catch(function(error) {
-                            console.error('Failed to load shared library paths:', error);
-                            container.innerHTML = '<p style="color: #ff5252;">Error loading shared library paths. Please check that the plugin is properly installed.</p>';
-                        });
-                },
-
-                /**
-                 * Renders a single shared library path card.
-                 */
-                renderSharedPathCard: function(label, path, contentType) {
-                    var safePath = this.escapeHtml(path);
-                    var html = '<div class="listItem" style="margin: 0.8em 0; padding: 1em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">';
-                    html += '<h4 style="margin: 0 0 0.5em 0;">' + this.escapeHtml(label) + '</h4>';
-                    html += '<div style="display: flex; gap: 0.5em; align-items: center;">';
-                    html += '<input type="text" class="emby-input" readonly value="' + safePath + '" style="flex: 1; font-family: monospace;" />';
-                    html += '<button is="emby-button" type="button" class="raised copy-button" data-path="' + safePath + '" style="min-width: 80px;">Copy</button>';
-                    html += '</div>';
-                    html += '<div class="fieldDescription" style="margin-top: 0.3em;">Content type: <strong>' + this.escapeHtml(contentType) + '</strong></div>';
-                    html += '</div>';
-                    return html;
-                },
-
-                /**
                  * Loads benchmark results from the API.
                  */
                 loadBenchmarkResults: function(page) {
@@ -790,7 +750,6 @@
                 if (LocalRecsConfig.initialized) {
                     if (page.querySelector('.tab-button-setup').classList.contains('ui-btn-active')) {
                         LocalRecsConfig.loadSetupStatus(page);
-                        LocalRecsConfig.loadSharedPaths(page);
                     }
                     return;
                 }
@@ -802,8 +761,7 @@
 
                 // Load setup status (default tab)
                 LocalRecsConfig.loadSetupStatus(page);
-                LocalRecsConfig.loadSharedPaths(page);
-                
+
                 // Load configuration for settings tab
                 LocalRecsConfig.loadConfiguration(page);
                 

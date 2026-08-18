@@ -61,19 +61,27 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                 var users = _userManager.GetUsers().ToList();
                 var paths = new List<UserLibraryPathInfo>();
 
+                var virtualFolders = _libraryManager.GetVirtualFolders();
+
+                bool LibraryExists(string path) => virtualFolders.Any(vf => vf.Locations.Any(loc =>
+                    loc.Equals(path, StringComparison.OrdinalIgnoreCase)));
+
                 foreach (var user in users)
                 {
                     var username = user.Username ?? "Unknown";
                     var moviePath = _virtualLibraryManager.GetUserLibraryPath(user.Id, MediaType.Movie);
                     var tvPath = _virtualLibraryManager.GetUserLibraryPath(user.Id, MediaType.Series);
+                    var leavingSoonMoviePath = _virtualLibraryManager.GetUserLeavingSoonPath(user.Id, MediaType.Movie);
+                    var leavingSoonTvPath = _virtualLibraryManager.GetUserLeavingSoonPath(user.Id, MediaType.Series);
+                    var removalMoviePath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Movie);
+                    var removalTvPath = _virtualLibraryManager.GetUserRemovalCandidatesPath(user.Id, MediaType.Series);
 
-                    // Check if both libraries exist by looking for virtual folders
-                    var virtualFolders = _libraryManager.GetVirtualFolders();
-                    bool movieLibraryExists = virtualFolders.Any(vf => vf.Locations.Any(loc =>
-                        loc.Equals(moviePath, StringComparison.OrdinalIgnoreCase)));
-                    bool tvLibraryExists = virtualFolders.Any(vf => vf.Locations.Any(loc =>
-                        loc.Equals(tvPath, StringComparison.OrdinalIgnoreCase)));
-                    bool librariesCreated = movieLibraryExists && tvLibraryExists;
+                    bool librariesCreated = LibraryExists(moviePath)
+                        && LibraryExists(tvPath)
+                        && LibraryExists(leavingSoonMoviePath)
+                        && LibraryExists(leavingSoonTvPath)
+                        && LibraryExists(removalMoviePath)
+                        && LibraryExists(removalTvPath);
 
                     paths.Add(new UserLibraryPathInfo
                     {
@@ -83,6 +91,14 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                         TvLibraryPath = tvPath,
                         SuggestedMovieLibraryName = $"{username}'s Recommended Movies",
                         SuggestedTvLibraryName = $"{username}'s Recommended TV",
+                        LeavingSoonMovieLibraryPath = leavingSoonMoviePath,
+                        LeavingSoonTvLibraryPath = leavingSoonTvPath,
+                        SuggestedLeavingSoonMovieLibraryName = $"{username}'s Leaving Soon Movies",
+                        SuggestedLeavingSoonTvLibraryName = $"{username}'s Leaving Soon TV",
+                        RemovalCandidatesMovieLibraryPath = removalMoviePath,
+                        RemovalCandidatesTvLibraryPath = removalTvPath,
+                        SuggestedRemovalCandidatesMovieLibraryName = $"{username}'s Removal Candidates Movies",
+                        SuggestedRemovalCandidatesTvLibraryName = $"{username}'s Removal Candidates TV",
                         LibrariesCreated = librariesCreated
                     });
                 }
@@ -94,22 +110,6 @@ namespace Jellyfin.Plugin.LocalRecs.Api
                 _logger.LogError(ex, "Failed to get library paths");
                 return StatusCode(500, "Failed to retrieve library paths");
             }
-        }
-
-        /// <summary>
-        /// Gets the shared library paths for Leaving Soon and Removal Candidates.
-        /// </summary>
-        /// <returns>Paths for all four shared libraries.</returns>
-        [HttpGet("Setup/SharedPaths")]
-        public ActionResult GetSharedPaths()
-        {
-            return Ok(new
-            {
-                LeavingSoonMoviesPath = _virtualLibraryManager.LeavingSoonMoviesPath,
-                LeavingSoonTvPath = _virtualLibraryManager.LeavingSoonTvPath,
-                RemovalCandidatesMoviesPath = _virtualLibraryManager.RemovalCandidatesMoviesPath,
-                RemovalCandidatesTvPath = _virtualLibraryManager.RemovalCandidatesTvPath
-            });
         }
 
         /// <summary>

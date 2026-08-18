@@ -142,7 +142,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                 if (leavingSoonState != null)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    _virtualLibraryManager.SyncLeavingSoon(leavingSoonState, allItems);
+                    _virtualLibraryManager.SyncLeavingSoon(leavingSoonState, allItems, users);
                 }
 
                 progress?.Report(90);
@@ -155,7 +155,7 @@ namespace Jellyfin.Plugin.LocalRecs.ScheduledTasks
                 try
                 {
                     var staleReport = _virtualLibraryManager.BuildStaleItemsReport(
-                        users.Select(u => (u.Id, u.Username ?? "Unknown")),
+                        users,
                         userRecommendations,
                         leavingSoonState,
                         allItems);

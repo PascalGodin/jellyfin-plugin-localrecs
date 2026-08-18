@@ -169,6 +169,10 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
             {
                 var moviePath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "movies");
                 var tvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "tv");
+                var leavingSoonMoviePath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "leaving-soon-movies");
+                var leavingSoonTvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "leaving-soon-tv");
+                var removalMoviePath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "removal-candidates-movies");
+                var removalTvPath = Path.Combine(_virtualLibraryBasePath, user.Id.ToString(), "removal-candidates-tv");
                 var username = user.Username ?? "Unknown";
 
                 sb.AppendLine($"User: {username} (ID: {user.Id})");
@@ -183,6 +187,26 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 sb.AppendLine("      Library Type: Shows");
                 sb.AppendLine($"      Suggested Name: \"{username}'s Recommended TV\"");
                 sb.AppendLine();
+                sb.AppendLine("  [3] Leaving Soon Movies:");
+                sb.AppendLine($"      Path: {leavingSoonMoviePath}");
+                sb.AppendLine("      Library Type: Movies");
+                sb.AppendLine($"      Suggested Name: \"{username}'s Leaving Soon Movies\"");
+                sb.AppendLine();
+                sb.AppendLine("  [4] Leaving Soon TV:");
+                sb.AppendLine($"      Path: {leavingSoonTvPath}");
+                sb.AppendLine("      Library Type: Shows");
+                sb.AppendLine($"      Suggested Name: \"{username}'s Leaving Soon TV\"");
+                sb.AppendLine();
+                sb.AppendLine("  [5] Removal Candidates Movies:");
+                sb.AppendLine($"      Path: {removalMoviePath}");
+                sb.AppendLine("      Library Type: Movies");
+                sb.AppendLine($"      Suggested Name: \"{username}'s Removal Candidates Movies\"");
+                sb.AppendLine();
+                sb.AppendLine("  [6] Removal Candidates TV:");
+                sb.AppendLine($"      Path: {removalTvPath}");
+                sb.AppendLine("      Library Type: Shows");
+                sb.AppendLine($"      Suggested Name: \"{username}'s Removal Candidates TV\"");
+                sb.AppendLine();
                 sb.AppendLine("  Setup Instructions:");
                 sb.AppendLine("    1. Go to Jellyfin Dashboard → Libraries → Add Media Library");
                 sb.AppendLine("    2. For EACH content type above, create a SEPARATE library:");
@@ -191,8 +215,10 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                 sb.AppendLine("       - Use the suggested library name");
                 sb.AppendLine("    3. Set library permissions:");
                 sb.AppendLine($"       - Dashboard → Users → {username} → Library Access");
-                sb.AppendLine($"       - Enable ONLY {username}'s recommendation libraries");
-                sb.AppendLine("       - Disable other users' recommendation libraries");
+                sb.AppendLine($"       - Enable ONLY {username}'s libraries (all six above)");
+                sb.AppendLine("       - Disable other users' libraries");
+                sb.AppendLine("       - Leaving Soon / Removal Candidates are per-user so a user only ever");
+                sb.AppendLine("         sees items from source libraries they already have access to.");
                 sb.AppendLine("--------------------------------------------------------------------------------");
             }
 

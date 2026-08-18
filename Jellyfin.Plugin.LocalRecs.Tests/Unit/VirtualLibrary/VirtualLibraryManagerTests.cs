@@ -129,6 +129,51 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit.VirtualLibrary
         }
 
         [Fact]
+        public void GetUserLeavingSoonPath_ReturnsCorrectMoviePath()
+        {
+            var userId = Guid.NewGuid();
+            var path = _manager.GetUserLeavingSoonPath(userId, MediaType.Movie);
+            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "leaving-soon-movies"));
+        }
+
+        [Fact]
+        public void GetUserLeavingSoonPath_ReturnsCorrectTvPath()
+        {
+            var userId = Guid.NewGuid();
+            var path = _manager.GetUserLeavingSoonPath(userId, MediaType.Series);
+            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "leaving-soon-tv"));
+        }
+
+        [Fact]
+        public void GetUserRemovalCandidatesPath_ReturnsCorrectMoviePath()
+        {
+            var userId = Guid.NewGuid();
+            var path = _manager.GetUserRemovalCandidatesPath(userId, MediaType.Movie);
+            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-movies"));
+        }
+
+        [Fact]
+        public void GetUserRemovalCandidatesPath_ReturnsCorrectTvPath()
+        {
+            var userId = Guid.NewGuid();
+            var path = _manager.GetUserRemovalCandidatesPath(userId, MediaType.Series);
+            path.Should().Be(Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-tv"));
+        }
+
+        [Fact]
+        public void EnsureUserDirectoriesExist_CreatesLeavingSoonAndRemovalCandidateDirectories()
+        {
+            var userId = Guid.NewGuid();
+            var result = _manager.EnsureUserDirectoriesExist(userId, "TestUser");
+
+            result.Should().BeTrue();
+            Directory.Exists(_manager.GetUserLeavingSoonPath(userId, MediaType.Movie)).Should().BeTrue();
+            Directory.Exists(_manager.GetUserLeavingSoonPath(userId, MediaType.Series)).Should().BeTrue();
+            Directory.Exists(_manager.GetUserRemovalCandidatesPath(userId, MediaType.Movie)).Should().BeTrue();
+            Directory.Exists(_manager.GetUserRemovalCandidatesPath(userId, MediaType.Series)).Should().BeTrue();
+        }
+
+        [Fact]
         public void SyncRecommendations_CreatesSymlinkToSourceMedia()
         {
             if (!CanCreateSymlinks())

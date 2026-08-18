@@ -38,6 +38,46 @@ namespace Jellyfin.Plugin.LocalRecs.Api
         public string SuggestedTvLibraryName { get; set; } = string.Empty;
 
         /// <summary>
+        /// Gets or sets the Leaving Soon movies library path.
+        /// </summary>
+        public string LeavingSoonMovieLibraryPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the Leaving Soon TV library path.
+        /// </summary>
+        public string LeavingSoonTvLibraryPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the suggested Leaving Soon movies library name.
+        /// </summary>
+        public string SuggestedLeavingSoonMovieLibraryName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the suggested Leaving Soon TV library name.
+        /// </summary>
+        public string SuggestedLeavingSoonTvLibraryName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the Removal Candidates movies library path.
+        /// </summary>
+        public string RemovalCandidatesMovieLibraryPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the Removal Candidates TV library path.
+        /// </summary>
+        public string RemovalCandidatesTvLibraryPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the suggested Removal Candidates movies library name.
+        /// </summary>
+        public string SuggestedRemovalCandidatesMovieLibraryName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the suggested Removal Candidates TV library name.
+        /// </summary>
+        public string SuggestedRemovalCandidatesTvLibraryName { get; set; } = string.Empty;
+
+        /// <summary>
         /// Gets or sets a value indicating whether the libraries are set up.
         /// </summary>
         public bool LibrariesCreated { get; set; }

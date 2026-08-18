@@ -248,15 +248,19 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             // any favorite flags that were not synced before the Leaving Soon gate runs.
             if (config.LeavingSoonEnabled)
             {
+                // Leaving Soon libraries are per-user, so scan every user's own folders — a favorite
+                // flagged in any one user's virtual library still protects the item household-wide.
+                var leavingSoonPaths = userIds.SelectMany(userId => new[]
+                {
+                    _virtualLibraryManager.GetUserLeavingSoonPath(userId, MediaType.Movie),
+                    _virtualLibraryManager.GetUserLeavingSoonPath(userId, MediaType.Series),
+                    _virtualLibraryManager.GetUserRemovalCandidatesPath(userId, MediaType.Movie),
+                    _virtualLibraryManager.GetUserRemovalCandidatesPath(userId, MediaType.Series),
+                });
+
                 var virtualProtected = _userProfileService.GetVirtualLeavingSoonProtectedStatuses(
                     userIds,
-                    new[]
-                    {
-                        _virtualLibraryManager.LeavingSoonMoviesPath,
-                        _virtualLibraryManager.LeavingSoonTvPath,
-                        _virtualLibraryManager.RemovalCandidatesMoviesPath,
-                        _virtualLibraryManager.RemovalCandidatesTvPath,
-                    });
+                    leavingSoonPaths);
                 foreach (var (actualItemId, isFavorite) in virtualProtected)
                 {
                     if (watchStatus.TryGetValue(actualItemId, out var ws))
