@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.31",
+        "changelog": "Fix: Leaving Soon still linked items outside a restricted user's libraries\n- Root cause: the per-user access check added in v0.6.1.27 used BaseItem.IsVisible(User) per item, which turned out not to filter by library folder access at all — confirmed via a live diagnostic showing a kids-only user's Leaving Soon library still contained titles from libraries they have no access to\n- Fix: replaced it with the same user-scoped ILibraryManager query (InternalItemsQuery(user) with Recursive=true) that RecommendationEngine already uses to correctly scope personalized recommendations to what a user can access — a mechanism already proven correct in this codebase, rather than a second, unverified API\n- Added a regression test (SyncLeavingSoon_OnlyLinksItemsAccessibleToEachUser) exercising the actual sync path end-to-end: a restricted user's Leaving Soon folder now only contains items the user-scoped query returns as accessible",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.31/jellyfin-plugin-localrecs-v0.6.1.31.zip",
+        "checksum": "",
+        "timestamp": "2026-08-18T00:00:00Z"
+      },
+      {
         "version": "0.6.1.30",
         "changelog": "Change: Removal Candidates is a single global library again, not per-user\n- v0.6.1.27 made both Leaving Soon and Removal Candidates per-user; Removal Candidates is meant as an admin-only deletion worklist rather than user-facing content, so per-user duplication (one folder pair of symlinks per user, all pointing at the same items) was pure waste with no access-control benefit\n- Removal Candidates is back to a single unfiltered library (RemovalCandidatesMoviesPath / RemovalCandidatesTvPath), set up once and granted only to admin account(s) \u2014 Leaving Soon stays per-user and unchanged from v0.6.1.27/28\n- The config page's Setup tab now has a separate \"Removal Candidates (global, admin-only)\" section below the per-user cards; the new Setup/GlobalPaths endpoint replaces the per-user removal fields removed from Setup/Paths\n- Migration: if you already created per-user Removal Candidates libraries in Jellyfin after upgrading to v0.6.1.27, delete them and add the single global pair shown on the Setup tab instead\n- Added/updated tests for the global (non-per-user) Removal Candidates paths and directory creation\n- (v0.6.1.29 never published: CI caught a StyleCop SA1201 ordering violation before release)",
         "targetAbi": "10.11.9.0",

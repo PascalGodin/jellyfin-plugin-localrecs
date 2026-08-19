@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using FluentAssertions;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.LocalRecs.Models;
 using Jellyfin.Plugin.LocalRecs.VirtualLibrary;
 using MediaBrowser.Controller.Entities;
@@ -181,6 +183,54 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Unit.VirtualLibrary
 
             var perUserRemovalPath = Path.Combine(_testBasePath, userId.ToString(), "removal-candidates-movies");
             Directory.Exists(perUserRemovalPath).Should().BeFalse();
+        }
+
+        [Fact]
+        public void SyncLeavingSoon_OnlyLinksItemsAccessibleToEachUser()
+        {
+            if (!CanCreateSymlinks())
+            {
+                return;
+            }
+
+            var accessibleMovieId = Guid.NewGuid();
+            var inaccessibleMovieId = Guid.NewGuid();
+
+            var accessibleFile = Path.Combine(_sourceMediaDir, "Accessible.mkv");
+            var inaccessibleFile = Path.Combine(_sourceMediaDir, "Inaccessible.mkv");
+            File.WriteAllText(accessibleFile, "x");
+            File.WriteAllText(inaccessibleFile, "x");
+
+            var accessibleMovie = new Movie { Id = accessibleMovieId, Name = "Accessible Movie", Path = accessibleFile, ProductionYear = 2023 };
+            var inaccessibleMovie = new Movie { Id = inaccessibleMovieId, Name = "Inaccessible Movie", Path = inaccessibleFile, ProductionYear = 2023 };
+
+            _mockLibraryManager.Setup(m => m.GetItemById(accessibleMovieId)).Returns(accessibleMovie);
+            _mockLibraryManager.Setup(m => m.GetItemById(inaccessibleMovieId)).Returns(inaccessibleMovie);
+
+            // The user-scoped query (what GetUserAccessibleItemIds calls) only returns the
+            // accessible item — simulates a user restricted to a library that doesn't contain
+            // inaccessibleMovie.
+            _mockLibraryManager.Setup(m => m.GetItemList(It.IsAny<InternalItemsQuery>()))
+                .Returns(new List<BaseItem> { accessibleMovie });
+
+            var user = new User("RestrictedUser", "Default", "Default");
+
+            var state = new LeavingSoonState();
+            state.FlaggedItems[accessibleMovieId.ToString()] = DateTime.UtcNow;
+            state.FlaggedItems[inaccessibleMovieId.ToString()] = DateTime.UtcNow;
+
+            var allItems = new List<MediaItemMetadata>
+            {
+                new MediaItemMetadata(accessibleMovieId, "Accessible Movie", MediaType.Movie),
+                new MediaItemMetadata(inaccessibleMovieId, "Inaccessible Movie", MediaType.Movie)
+            };
+
+            _manager.SyncLeavingSoon(state, allItems, new[] { user });
+
+            var leavingSoonMoviePath = _manager.GetUserLeavingSoonPath(user.Id, MediaType.Movie);
+            var folders = Directory.GetDirectories(leavingSoonMoviePath);
+            folders.Should().HaveCount(1);
+            folders[0].Should().Contain("Accessible Movie");
         }
 
         [Fact]

@@ -196,7 +196,7 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
         /// <summary>
         /// Clears and recreates Leaving Soon (per-user) and Removal Candidates (global) libraries.
         /// Household-wide flagging (which items are Leaving Soon / Removal Candidates at all) is
-        /// unchanged. Leaving Soon links into each user's own folder only items BaseItem.IsVisible(User)
+        /// unchanged. Leaving Soon links into each user's own folder only items GetUserAccessibleItemIds
         /// says that user can already see via their normal library access — so a user restricted to a
         /// kids library never gets a Leaving Soon symlink into content outside that library. Removal
         /// Candidates stays a single unfiltered library, since it's an admin-only deletion worklist,
@@ -451,38 +451,49 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
         }
 
         /// <summary>
-        /// Narrows a set of item IDs down to the ones the given user can actually see, using
-        /// Jellyfin's own BaseItem.IsVisible(User) so library access and parental
-        /// controls are honored exactly as they are everywhere else in Jellyfin.
+        /// Gets the set of movie/series item IDs a user can access, using Jellyfin's built-in
+        /// user-scoped query (same mechanism RecommendationEngine.GetUserAccessibleItemIds already
+        /// relies on) so library access grants are honored exactly as Jellyfin itself applies them.
+        /// A prior attempt at this used BaseItem.IsVisible(User) per item, which turned out not to
+        /// filter by library access at all — items outside a restricted user's libraries were still
+        /// getting linked. This query-based approach is the same one already proven correct for
+        /// scoping personalized recommendations to what a user can see.
+        /// </summary>
+        private HashSet<Guid> GetUserAccessibleItemIds(User user)
+        {
+            var accessibleItems = _libraryManager.GetItemList(new InternalItemsQuery(user)
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Series },
+                IsVirtualItem = false,
+                Recursive = true
+            });
+
+            return accessibleItems.Select(i => i.Id).ToHashSet();
+        }
+
+        /// <summary>
+        /// Narrows a set of item IDs down to the ones the given user can actually see.
         /// </summary>
         private HashSet<Guid> VisibleTo(IEnumerable<Guid> itemIds, User user)
         {
-            var result = new HashSet<Guid>();
-            foreach (var id in itemIds)
-            {
-                var item = _libraryManager.GetItemById(id);
-                if (item != null && item.IsVisible(user))
-                {
-                    result.Add(id);
-                }
-            }
-
-            return result;
+            var accessibleIds = GetUserAccessibleItemIds(user);
+            return itemIds.Where(accessibleIds.Contains).ToHashSet();
         }
 
         /// <summary>
         /// Syncs a global, unfiltered library (currently just Removal Candidates) — every item is
         /// linked regardless of any user's access grants.
         /// </summary>
-        private void SyncGlobalLibrary(string libraryPath, IEnumerable<Guid> itemIds) => SyncLibrary(libraryPath, itemIds, user: null);
+        private void SyncGlobalLibrary(string libraryPath, IEnumerable<Guid> itemIds) => SyncLibrary(libraryPath, itemIds);
 
         /// <summary>
         /// Syncs a per-user library (currently just Leaving Soon) — an item is only linked in if
         /// the user can already see it via their normal library access grants.
         /// </summary>
-        private void SyncUserLibrary(string libraryPath, IEnumerable<Guid> itemIds, User user) => SyncLibrary(libraryPath, itemIds, user);
+        private void SyncUserLibrary(string libraryPath, IEnumerable<Guid> itemIds, User user) =>
+            SyncLibrary(libraryPath, VisibleTo(itemIds, user));
 
-        private void SyncLibrary(string libraryPath, IEnumerable<Guid> itemIds, User? user)
+        private void SyncLibrary(string libraryPath, IEnumerable<Guid> itemIds)
         {
             if (Directory.Exists(libraryPath))
             {
@@ -498,13 +509,6 @@ namespace Jellyfin.Plugin.LocalRecs.VirtualLibrary
                     var item = _libraryManager.GetItemById(itemId);
                     if (item == null || string.IsNullOrEmpty(item.Path))
                     {
-                        continue;
-                    }
-
-                    if (user != null && !item.IsVisible(user))
-                    {
-                        // User doesn't have access to the source library this item lives in —
-                        // never link it into their Leaving Soon folder.
                         continue;
                     }
 
