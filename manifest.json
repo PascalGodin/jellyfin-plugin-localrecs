@@ -12,7 +12,7 @@
         "changelog": "Simplify: revert the Promote() favorite check added in v0.6.1.32, keep only the Removal Candidates cleanup fix\n- v0.6.1.32 added a favorite check inside Promote() (unflag instead of promote) alongside the Removal Candidates cleanup fix, but Promote() doesn't need it: Discover() already evicts favorited items from the Leaving Soon list every run, and the Removal Candidates cleanup pass runs immediately after Promote() in the same refresh, so a favorited item that gets promoted is evicted again right away in the same run either way\n- Reverted Promote() to its original dwell-time-only form; the actual fix (evicting Removal Candidates entries for items favorited after promotion) is unchanged from v0.6.1.32\n- Test updated to reflect that the item is promoted then immediately evicted in the same run, rather than never promoted",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.33/jellyfin-plugin-localrecs-v0.6.1.33.zip",
-        "checksum": "",
+        "checksum": "6a79822a186efc9e67542eb75ce26c7d",
         "timestamp": "2026-09-06T00:00:00Z"
       },
       {
