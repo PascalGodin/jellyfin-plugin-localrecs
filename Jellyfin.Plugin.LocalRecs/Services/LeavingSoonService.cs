@@ -102,7 +102,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
 
             // Pass 1: Promote items that have exceeded the dwell period
-            Promote(state, watchStatus, config);
+            Promote(state, config);
             cancellationToken.ThrowIfCancellationRequested();
 
             var knownItemIds = new HashSet<string>(allItems.Select(a => a.Id.ToString()), StringComparer.OrdinalIgnoreCase);
@@ -158,25 +158,12 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             return Guid.TryParse(itemId, out var id) && watchStatus.TryGetValue(id, out var ws) && ws.IsAnyFavorite;
         }
 
-        private void Promote(
-            LeavingSoonState state,
-            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
-            PluginConfiguration config)
+        private void Promote(LeavingSoonState state, PluginConfiguration config)
         {
-            var dueForAction = state.FlaggedItems
+            var toPromote = state.FlaggedItems
                 .Where(kvp => (DateTime.UtcNow - kvp.Value).TotalDays >= config.LeavingSoonDwellDays)
                 .Select(kvp => kvp.Key)
                 .ToList();
-
-            var toPromote = new List<string>();
-            var toUnflag = new List<string>();
-
-            foreach (var id in dueForAction)
-            {
-                // Favorited after being flagged but before the dwell period elapsed — unflag
-                // instead of promoting, since favoriting makes an item permanently safe.
-                (IsFavorited(id, watchStatus) ? toUnflag : toPromote).Add(id);
-            }
 
             foreach (var id in toPromote)
             {
@@ -184,17 +171,9 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 state.RemovalCandidates[id] = DateTime.UtcNow;
             }
 
-            foreach (var id in toUnflag)
+            if (toPromote.Count > 0)
             {
-                state.FlaggedItems.Remove(id);
-            }
-
-            if (toPromote.Count > 0 || toUnflag.Count > 0)
-            {
-                _logger.LogDebug(
-                    "Leaving Soon promotion: moved {Count} items to Removal Candidates, unflagged {UnflaggedCount} now-favorited items",
-                    toPromote.Count,
-                    toUnflag.Count);
+                _logger.LogDebug("Leaving Soon promotion: moved {Count} items to Removal Candidates", toPromote.Count);
             }
         }
 

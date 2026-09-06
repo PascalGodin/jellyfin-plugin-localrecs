@@ -220,11 +220,12 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
         }
 
         [Fact]
-        public void Refresh_FlaggedItemFavoritedBeforeDwellExpires_IsUnflaggedNotPromoted()
+        public void Refresh_FlaggedItemFavoritedBeforeDwellExpires_EndsUpInNeitherList()
         {
-            // Arrange: an item flagged long ago (past its dwell period) but favorited since —
-            // favoriting should make it permanently safe rather than letting it fall through to
-            // Removal Candidates on the next dwell-based promotion pass.
+            // Arrange: an item flagged long ago (past its dwell period) but favorited since.
+            // Promote() still promotes it on elapsed dwell time alone (unchanged), but the same
+            // run's Removal Candidates cleanup pass evicts it immediately for being favorited —
+            // so it ends up in neither list without Promote() needing to know about favorites.
             var service = CreateService();
             var favoritedMovieId = Guid.NewGuid();
             var library = new List<MediaItemMetadata>
