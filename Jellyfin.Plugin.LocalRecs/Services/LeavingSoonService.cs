@@ -102,7 +102,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             var minAge = TimeSpan.FromDays(config.LeavingSoonMinAgeDays);
 
             // Pass 1: Promote items that have exceeded the dwell period
-            Promote(state, config);
+            Promote(state, watchStatus, config);
             cancellationToken.ThrowIfCancellationRequested();
 
             var knownItemIds = new HashSet<string>(allItems.Select(a => a.Id.ToString()), StringComparer.OrdinalIgnoreCase);
@@ -121,11 +121,14 @@ namespace Jellyfin.Plugin.LocalRecs.Services
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Pass 3: Remove removal candidate entries for items that no longer exist in the library.
-            // FlaggedItems are already cleaned up by discovery eviction (Pass 2) — deleted items aren't
-            // scored and fall out of the target set, so they get evicted automatically. RemovalCandidates
-            // have no such mechanism: once promoted, entries accumulate indefinitely unless explicitly pruned.
-            var removedRemoval = state.RemovalCandidates.Keys.Where(id => !knownItemIds.Contains(id)).ToList();
+            // Pass 3: Remove removal candidate entries for items that no longer exist in the library,
+            // or that have since been favorited. FlaggedItems are already cleaned up by discovery
+            // eviction (Pass 2) — deleted or now-favorited items aren't scored and fall out of the
+            // target set, so they get evicted automatically. RemovalCandidates have no such mechanism:
+            // once promoted, entries accumulate indefinitely unless explicitly pruned here.
+            var removedRemoval = state.RemovalCandidates.Keys
+                .Where(id => !knownItemIds.Contains(id) || IsFavorited(id, watchStatus))
+                .ToList();
             foreach (var id in removedRemoval)
             {
                 state.RemovalCandidates.Remove(id);
@@ -134,7 +137,7 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             if (removedRemoval.Count > 0)
             {
                 _logger.LogInformation(
-                    "Leaving Soon cleanup: removed {RemovedRemoval} removal candidates for items no longer in the library",
+                    "Leaving Soon cleanup: removed {RemovedRemoval} removal candidates (no longer in library or now favorited)",
                     removedRemoval.Count);
             }
 
@@ -148,12 +151,32 @@ namespace Jellyfin.Plugin.LocalRecs.Services
             return (state, diagnostics);
         }
 
-        private void Promote(LeavingSoonState state, PluginConfiguration config)
+        private static bool IsFavorited(
+            string itemId,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus)
         {
-            var toPromote = state.FlaggedItems
+            return Guid.TryParse(itemId, out var id) && watchStatus.TryGetValue(id, out var ws) && ws.IsAnyFavorite;
+        }
+
+        private void Promote(
+            LeavingSoonState state,
+            IReadOnlyDictionary<Guid, (DateTime? LatestWatchDate, bool IsAnyFavorite)> watchStatus,
+            PluginConfiguration config)
+        {
+            var dueForAction = state.FlaggedItems
                 .Where(kvp => (DateTime.UtcNow - kvp.Value).TotalDays >= config.LeavingSoonDwellDays)
                 .Select(kvp => kvp.Key)
                 .ToList();
+
+            var toPromote = new List<string>();
+            var toUnflag = new List<string>();
+
+            foreach (var id in dueForAction)
+            {
+                // Favorited after being flagged but before the dwell period elapsed — unflag
+                // instead of promoting, since favoriting makes an item permanently safe.
+                (IsFavorited(id, watchStatus) ? toUnflag : toPromote).Add(id);
+            }
 
             foreach (var id in toPromote)
             {
@@ -161,9 +184,17 @@ namespace Jellyfin.Plugin.LocalRecs.Services
                 state.RemovalCandidates[id] = DateTime.UtcNow;
             }
 
-            if (toPromote.Count > 0)
+            foreach (var id in toUnflag)
             {
-                _logger.LogDebug("Leaving Soon promotion: moved {Count} items to Removal Candidates", toPromote.Count);
+                state.FlaggedItems.Remove(id);
+            }
+
+            if (toPromote.Count > 0 || toUnflag.Count > 0)
+            {
+                _logger.LogDebug(
+                    "Leaving Soon promotion: moved {Count} items to Removal Candidates, unflagged {UnflaggedCount} now-favorited items",
+                    toPromote.Count,
+                    toUnflag.Count);
             }
         }
 

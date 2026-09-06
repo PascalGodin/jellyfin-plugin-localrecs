@@ -219,6 +219,39 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
             // when discovery is skipped — actually it IS persisted because SaveState runs after both passes.
         }
 
+        [Fact]
+        public void Refresh_FlaggedItemFavoritedBeforeDwellExpires_IsUnflaggedNotPromoted()
+        {
+            // Arrange: an item flagged long ago (past its dwell period) but favorited since —
+            // favoriting should make it permanently safe rather than letting it fall through to
+            // Removal Candidates on the next dwell-based promotion pass.
+            var service = CreateService();
+            var favoritedMovieId = Guid.NewGuid();
+            var library = new List<MediaItemMetadata>
+            {
+                new MediaItemMetadata(favoritedMovieId, "Now Favorited", MediaType.Movie)
+                {
+                    ReleaseYear = 2020, CommunityRating = 8.0f
+                }
+            };
+            MockLibraryItem(library[0]);
+
+            var embeddings = CreateEmbeddings(library);
+            var config = DefaultConfig(dwellDays: 1, minAgeDays: 0);
+
+            var oldState = new LeavingSoonState();
+            oldState.FlaggedItems[favoritedMovieId.ToString()] = DateTime.UtcNow.AddDays(-365);
+            var jsonPath = Path.Combine(_tempDir, "leaving-soon-state.json");
+            File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
+
+            var watchStatus = new Dictionary<Guid, (DateTime?, bool)> { [favoritedMovieId] = (null, true) };
+
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, NoRecommendations, config, default);
+
+            state.FlaggedItems.Should().NotContainKey(favoritedMovieId.ToString());
+            state.RemovalCandidates.Should().NotContainKey(favoritedMovieId.ToString());
+        }
+
         #endregion
 
         #region Removal Candidate Cleanup Tests (Pass 3)
@@ -288,6 +321,38 @@ namespace Jellyfin.Plugin.LocalRecs.Tests.Domain
 
             // Assert: existing items should be kept
             state.RemovalCandidates.Should().ContainKey(existingMovieId.ToString());
+        }
+
+        [Fact]
+        public void Refresh_RemovalCandidateThatBecomesFavorited_IsRemoved()
+        {
+            // Arrange: an item already promoted to Removal Candidates on a prior run, favorited
+            // since then. Favoriting must retroactively protect it, not just block future flagging.
+            var service = CreateService();
+            var favoritedMovieId = Guid.NewGuid();
+
+            var library = new List<MediaItemMetadata>
+            {
+                new MediaItemMetadata(favoritedMovieId, "Now Favorited", MediaType.Movie)
+                {
+                    ReleaseYear = 2020, CommunityRating = 8.0f
+                }
+            };
+            MockLibraryItem(library[0]);
+
+            var embeddings = CreateEmbeddings(library);
+            var config = DefaultConfig(dwellDays: 1, minAgeDays: 0);
+
+            var oldState = new LeavingSoonState();
+            oldState.RemovalCandidates[favoritedMovieId.ToString()] = DateTime.UtcNow.AddDays(-5);
+            var jsonPath = Path.Combine(_tempDir, "leaving-soon-state.json");
+            File.WriteAllText(jsonPath, System.Text.Json.JsonSerializer.Serialize(oldState));
+
+            var watchStatus = new Dictionary<Guid, (DateTime?, bool)> { [favoritedMovieId] = (null, true) };
+
+            var (state, _) = service.Refresh(library, embeddings, Array.Empty<UserProfile>(), watchStatus, NoRecommendations, config, default);
+
+            state.RemovalCandidates.Should().NotContainKey(favoritedMovieId.ToString());
         }
 
         [Fact]

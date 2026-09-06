@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.6.1.32",
+        "changelog": "Fix: favoriting an item didn't protect it from Removal Candidates once already flagged\n- Root cause: Promote() moved Leaving Soon items into Removal Candidates purely based on elapsed dwell time, never re-checking favorite status; and the only Removal Candidates cleanup pass pruned entries for items no longer in the library, never for items that had since been favorited — so favoriting something already promoted (or about to be) had no effect\n- Fix: Promote() now unflags a due-for-promotion item instead of promoting it if it's since been favorited, and the existing cleanup pass now also evicts any Removal Candidates entry whose item is currently favorited, so favoriting is retroactive even after promotion already happened\n- Added regression tests for both paths: a flagged item favorited before its dwell period elapses, and a removal candidate favorited after already being promoted",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.32/jellyfin-plugin-localrecs-v0.6.1.32.zip",
+        "checksum": "",
+        "timestamp": "2026-09-06T00:00:00Z"
+      },
+      {
         "version": "0.6.1.31",
         "changelog": "Fix: Leaving Soon still linked items outside a restricted user's libraries\n- Root cause: the per-user access check added in v0.6.1.27 used BaseItem.IsVisible(User) per item, which turned out not to filter by library folder access at all \u2014 confirmed via a live diagnostic showing a kids-only user's Leaving Soon library still contained titles from libraries they have no access to\n- Fix: replaced it with the same user-scoped ILibraryManager query (InternalItemsQuery(user) with Recursive=true) that RecommendationEngine already uses to correctly scope personalized recommendations to what a user can access \u2014 a mechanism already proven correct in this codebase, rather than a second, unverified API\n- Added a regression test (SyncLeavingSoon_OnlyLinksItemsAccessibleToEachUser) exercising the actual sync path end-to-end: a restricted user's Leaving Soon folder now only contains items the user-scoped query returns as accessible",
         "targetAbi": "10.11.9.0",
