@@ -9,10 +9,10 @@
     "versions": [
       {
         "version": "0.6.1.32",
-        "changelog": "Fix: favoriting an item didn't protect it from Removal Candidates once already flagged\n- Root cause: Promote() moved Leaving Soon items into Removal Candidates purely based on elapsed dwell time, never re-checking favorite status; and the only Removal Candidates cleanup pass pruned entries for items no longer in the library, never for items that had since been favorited — so favoriting something already promoted (or about to be) had no effect\n- Fix: Promote() now unflags a due-for-promotion item instead of promoting it if it's since been favorited, and the existing cleanup pass now also evicts any Removal Candidates entry whose item is currently favorited, so favoriting is retroactive even after promotion already happened\n- Added regression tests for both paths: a flagged item favorited before its dwell period elapses, and a removal candidate favorited after already being promoted",
+        "changelog": "Fix: favoriting an item didn't protect it from Removal Candidates once already flagged\n- Root cause: Promote() moved Leaving Soon items into Removal Candidates purely based on elapsed dwell time, never re-checking favorite status; and the only Removal Candidates cleanup pass pruned entries for items no longer in the library, never for items that had since been favorited \u2014 so favoriting something already promoted (or about to be) had no effect\n- Fix: Promote() now unflags a due-for-promotion item instead of promoting it if it's since been favorited, and the existing cleanup pass now also evicts any Removal Candidates entry whose item is currently favorited, so favoriting is retroactive even after promotion already happened\n- Added regression tests for both paths: a flagged item favorited before its dwell period elapses, and a removal candidate favorited after already being promoted",
         "targetAbi": "10.11.9.0",
         "sourceUrl": "https://github.com/PascalGodin/jellyfin-plugin-localrecs/releases/download/v0.6.1.32/jellyfin-plugin-localrecs-v0.6.1.32.zip",
-        "checksum": "",
+        "checksum": "7a49fab250fd9d864c87cd9d13241b95",
         "timestamp": "2026-09-06T00:00:00Z"
       },
       {
